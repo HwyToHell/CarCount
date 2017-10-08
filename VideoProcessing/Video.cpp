@@ -48,11 +48,7 @@ int main(int argc, char* argv[])
 	*/
 	
 	mog2.updateAll();
-	/*mog2.createTrackbars();
-	SaveSamples ss(&fDilate, &fgMaskMOG2);
-	string sampleDir = ss.CreateDir();
-	cout << "Saving frames to: " << sampleDir << endl;
-	*/
+
 	cv::Ptr<cv::BackgroundSubtractorMOG2> pMOG2_1;	
 	pMOG2_1 = new cv::BackgroundSubtractorMOG2(100,15,0);
 
