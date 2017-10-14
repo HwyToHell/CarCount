@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "tracking.h"
+#include "../include/Tracking.h"
 
 using namespace std;
 using namespace cv;

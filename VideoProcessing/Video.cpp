@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "KeyPress.h"
-#include "Parameters.h"
+#include "../include/Parameters.h"
 #include "vibe-background-sequential.h"
 #include "FrameDiff.h"
 
@@ -14,7 +14,7 @@ void SegmentFrameVibe(vibeModel_Sequential_t* model, const cv::Mat& frame, cv::M
 	
 
 
-int main(int argc, char* argv[])
+int _main(int argc, char* argv[])
 {
 
 	//cv::VideoCapture cap("D:/Holger/AppDev/OpenCV/BGS_old/Debug/dataset/traffic.wmv");

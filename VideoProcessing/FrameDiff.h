@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "Tracking.h"
+#include "../include/Tracking.h"
 
 class FrameDiff
 {

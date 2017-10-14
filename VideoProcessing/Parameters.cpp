@@ -1,6 +1,5 @@
 #include "stdafx.h"
-#include "Parameters.h"
-
+#include "../include/Parameters.h"
 
 
 double round(double number) // not necessary in C++11

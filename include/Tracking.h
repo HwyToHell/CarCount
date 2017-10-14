@@ -1,4 +1,4 @@
-#include "stdafx.h"
+
 
 // helper functions
 double EuclideanDist(cv::Point& pt1, cv::Point& pt2);

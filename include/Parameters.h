@@ -1,5 +1,3 @@
-#include "stdafx.h"
-
 double round(double number); // not necessary in C++11
 
 class Parameter {

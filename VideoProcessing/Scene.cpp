@@ -1,5 +1,5 @@
 #include "stdafx.h"
-#include "Tracking.h"
+#include "../include/Tracking.h"
 
 Scene::Scene() : confCreate(3), maxNoIDs(9), trafficFlowUnitVec(1,0)
 {
@@ -94,10 +94,10 @@ void Scene::UpdateTracks(std::list<TrackEntry>& blobs)
 
 }
 
-// update tracks from contours of blobs
-// convert vector of contours to list of bboxes for further processing
-// erase bbox, if marked for deletion
-// create new tracks from unassigned blobs
+/// update tracks from contours of blobs
+/// convert vector of contours to list of bboxes for further processing
+/// erase bbox, if marked for deletion
+/// create new tracks from unassigned blobs
 void Scene::UpdateTracksFromContours(const std::vector<std::vector<cv::Point>>& contours, std::vector<std::vector<cv::Point>>& movingContours)
 {
 	// clean up too small and too big contours

@@ -1,6 +1,6 @@
 #include "stdafx.h"
 #include "KeyPress.h"
-#include "Parameters.h"
+#include "../include/Parameters.h"
 #include "sqlite\sqlite3.h"
 
 

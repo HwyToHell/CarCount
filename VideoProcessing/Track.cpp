@@ -1,6 +1,6 @@
 #include "stdafx.h"
-#include "Tracking.h"
-#include "Parameters.h"
+#include "../include/Tracking.h"
+#include "../include/Parameters.h"
 
 
 double EuclideanDist(cv::Point& pt1, cv::Point& pt2)
