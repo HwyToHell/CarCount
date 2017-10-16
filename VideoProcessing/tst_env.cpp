@@ -26,7 +26,7 @@ string getHome()
 		pHomePath = getenv("HOMEPATH");
 		if (pHomePath !=0)
 			home.append(string(pHomePath));
-	#elif defined (_UNIX)
+	#elif defined (__linux__)
 		char *pHome;
 		pHomePath = getenv("HOME");
 		if (pHome !=0)
