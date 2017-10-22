@@ -1,7 +1,7 @@
 #include "stdafx.h"
 #include "KeyPress.h"
 #include "../include/Parameters.h"
-#include "sqlite\sqlite3.h"
+#include "sqlite/sqlite3.h"
 
 
 using namespace std;
