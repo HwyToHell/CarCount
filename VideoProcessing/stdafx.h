@@ -5,7 +5,7 @@
 
 #pragma once
 #include <opencv2/opencv.hpp>
-#include <Windows.h>
+#include <windows.h>
 #include <conio.h>
 #include <direct.h> // for _mkdir
 #include <assert.h> // for vibe

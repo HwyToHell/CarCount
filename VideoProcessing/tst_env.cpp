@@ -1,7 +1,10 @@
 #include "stdafx.h"
 #include <cstdlib>
 #include <cstring>
+#include <locale>
 #include "sqlite/sqlite3.h"
+//#include <boost/filesystem.hpp>
+//..VideoProcessing/..OpenCV/..AppDev/
 
 using namespace std;
 
@@ -12,6 +15,8 @@ public:
 	string getName();
 	string getType();
 	string getValue();
+	double getDouble();
+	int getInt();
 	bool setValue(string& _value);
 
 private:
@@ -20,17 +25,30 @@ private:
 	string value;
 };
 
+class Config {
+public:
+	Config();
+	bool Init();
+private:
+	string dbFileName;
+	string workDir;
+	string dbPath;
+	string dbTblConfig;
+	string dbTblData; // table for time series
+	list<Parameter> parameters;
+	bool setDbPath(string& workDir);
+};
 
 string getHome();
+string& appendDirToPath(string& path, string& dir);
 sqlite3* openDb(const char *filename);
 list<Parameter> loadParams(sqlite3* db);
 
 
 int main(int argc, char *argv[])
 {
-	string str;
-	str = getHome();
-	cout << "GetHome: " << str << endl;
+	Config cfg;
+	cfg.Init();
 	sqlite3 *db = openDb("carcounter.sqlite");
 	if (db != NULL)
 		list<Parameter> parList = loadParams(db);
@@ -38,6 +56,7 @@ int main(int argc, char *argv[])
 		cerr << __LINE__ << " db pointer == NULL" << endl;
 
 	cout << endl << "hit enter to exit";
+	string str;
 	getline(cin, str);
 	return 0;
 }
@@ -52,10 +71,7 @@ string getHome()
 			home += pHomeDrive;
 		pHomePath = getenv("HOMEPATH");
 		if (pHomePath !=0)
-		{
-			home += pHomePath;
-			home += '\\';
-		}
+			home = appendDirToPath(home, string(pHomePath));
 	#elif defined (__linux__)
 		char *pHome;
 		pHomePath = getenv("HOME");
@@ -78,6 +94,7 @@ sqlite3* openDb(const char *filename)
 	int rc;
 
 	fullPath = getHome();
+	fullPath += "count_traffic\\";
 	fullPath += filename;
 
 	rc = sqlite3_open(fullPath.c_str(), &db);
@@ -146,17 +163,7 @@ int queryDbSingle(const string& sql, sqlite3* db, string& value)
 
 }
 
-/**ToDo
-open db = OK
-parameterlist "name" "type" "value"
-does table exist -y-> read columns
-	-n-> create one
-if column exist -y-> read parameter from db
-	-n-> use std parameter, write to db
-if not exist take standard and write back to db
 
-introduce
-*/
 
 list<Parameter> loadParams(sqlite3* db)
 {
@@ -168,6 +175,7 @@ list<Parameter> loadParams(sqlite3* db)
 	params.push_back(Parameter("roi_y", "int", "240"));
 	params.push_back(Parameter("confidence", "int", "5"));
 	params.push_back(Parameter("same_velocity", "real", "0.2"));
+
 
 	
 	list<Parameter>::iterator it = params.begin();
@@ -232,10 +240,148 @@ string Parameter::getValue()
 	return value;
 }
 
+double Parameter::getDouble()
+{
+	return stod(value);
+}
+
+int Parameter::getInt()
+{
+	return stoi(value);
+}
+
 bool Parameter::setValue(string& _value)
 {
 	//TODO: extract typed value from parameter string
 	value = _value;
 	return true;
 }
+
+
+Config::Config()
+{
+	if (!Init())
+		cerr << __LINE__ << " error initializing config instance" << endl;
+}
+
+bool PathExists(string& path)
+{
+	#if defined (_WIN32)
+		wstring wPath;
+		wPath.assign(path.begin(), path.end());
+
+		DWORD fileAttrib = GetFileAttributes(wPath.c_str());
+		if (fileAttrib == INVALID_FILE_ATTRIBUTES)
+		{
+			DWORD lastError = GetLastError();
+			if (lastError != ERROR_FILE_NOT_FOUND && lastError != ERROR_PATH_NOT_FOUND)
+				throw 3;
+			return false;
+		}
+		else
+			return true;
+	#elif defined (__linux__)
+		// use stat from <sys/stat.h>
+		throw 2;
+	#else
+		throw 1;
+	#endif
+}
+
+
+bool MakeDir(string& dir)
+{
+	#if defined (_WIN32)
+		wstring wDir;
+		wDir.assign(dir.begin(), dir.end());
+
+		if (CreateDirectory(wDir.c_str(), 0))
+			return true;
+		DWORD error = GetLastError();
+		if (GetLastError() == ERROR_ALREADY_EXISTS)
+			return true;
+		else 
+			return false;
+	#elif defined (__linux__)
+		//use mkdir from <unistd.h>
+		throw 2;
+	#else
+		throw 1;
+	#endif
+}
+
+
+bool MakePath(string& path)
+{
+	#if defined (_WIN32)
+		char delim = '\\';
+	#elif defined (__linux__)
+		char delim = '/';
+	#else
+		throw 1;
+	#endif
+	bool success = true;
+	size_t posBegin = 0, posEnd = 0;
+
+	posEnd = path.find_first_of(delim);
+	while (success == true && posEnd != string::npos)
+	{
+		size_t length = posEnd - posBegin;
+
+		if (length > 0)
+		{
+			// skip leading and subsequent delimiters
+			string dirToCreate = path.substr(0, posEnd);
+			success = MakeDir(dirToCreate);
+		}
+		posBegin = posEnd + 1;
+		posEnd = path.find_first_of(delim, posBegin);
+	}
+	return success;
+}
+
+string& appendDirToPath(string& path, string& dir)
+{
+	path += dir;
+	#if defined (_WIN32)
+			path += '\\';
+	#elif defined (__linux__)
+			path += '/';
+	#else
+		throw 1;
+	#endif
+	return path;
+}
+
+bool Config::Init()
+{
+	/* TODO set standard parameters */
+
+	/* compose working path */
+	workDir = "count_traffic";
+	dbPath = appendDirToPath(getHome(), workDir);
+	
+	// if working directory does not exists -> create it
+	if (!PathExists(dbPath))
+		if (!MakePath(dbPath))
+		{
+			cerr << __LINE__ << " cannot create working directory" << endl;
+			cerr << GetLastError() << endl;
+			return false;
+		}
+
+
+	/* TODO load actual parameters from file 
+	 *  open db, (create if not exists)
+	 *  create config table (if not exists)
+	 *  query parameters
+	 */
+	dbTblConfig = "config";
+
+
+
+	return true;
+}
+
+
 
