@@ -16,7 +16,8 @@
 #include <cmath>
 #include <string>
 #include <list>
-#include "..\..\..\catch\catch.hpp"
+#include "sqlite/sqlite3.h"
+#include "../../../catch/catch.hpp"
 
 
 
