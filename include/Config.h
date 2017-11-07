@@ -17,8 +17,14 @@ private:
 
 class Config {
 public:
-	Config();
-	bool Init();
+	Config(std::string dbFileName = "");
+	~Config();
+	bool init();
+	bool populateStdParams();
+	bool openDb(std::string& dbFile);
+	bool queryDbSingle(const std::string& sql, std::string&);
+	double getDouble(std::string name);
+
 private:
 	sqlite3* mDbHandle;
 	std::string mDbFile;
@@ -28,19 +34,15 @@ private:
 	std::string mDbTblData; // table for time series
 	std::list<Parameter> mParamList;
 
-	bool LoadParams(sqlite3* db);
+	// TODO 
+	// loadParam("all" - load all, "name" - load only param 'name')
+	bool loadParams();
+	bool saveParams();
 };
 
 // Directory manipulation functions
 std::string getHome();
 std::string& appendDirToPath(std::string& path, std::string& dir);
-bool PathExists(std::string& path);
-bool MakeDir(std::string& dir);
-bool MakePath(std::string& path);
-
-// DB functions
-sqlite3* openDb(const std::string& fullPath);
-bool queryDbSingle(const std::string& sql, sqlite3* db, std::string&);
-
-
-
+bool pathExists(std::string& path);
+bool makeDir(std::string& dir);
+bool makePath(std::string& path);

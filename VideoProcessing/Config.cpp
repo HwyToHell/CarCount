@@ -3,92 +3,115 @@
 
 using namespace std;
 
-Parameter::Parameter(string name, string type, string value) : mName(name), mType(type), mValue(value)
-{
+Parameter::Parameter(string name, string type, string value) : mName(name), mType(type), mValue(value) {}
 
-}
-
-string Parameter::getName()
-{
+string Parameter::getName() {
 	return mName;
 }
 
-string Parameter::getType()
-{
+string Parameter::getType() {
 	return mType;
 }
 
-string Parameter::getValue()
-{
+string Parameter::getValue() {
 	return mValue;
 }
 
-double Parameter::getDouble()
-{
+double Parameter::getDouble() {
 	return stod(mValue);
 }
 
-int Parameter::getInt()
-{
+int Parameter::getInt() {
 	return stoi(mValue);
 }
 
-bool Parameter::setValue(string& value)
-{
+bool Parameter::setValue(string& value) {
 	mValue = value;
 	return true;
 }
 
 
-Config::Config()
-{
-	if (!Init())
+Config::Config(string dbFileName) {
+	bool success = false;
+	success = populateStdParams();
+	success = openDb(dbFileName);
+	if (!success)
 		cerr << __LINE__ << " error initializing config instance" << endl;
 }
 
-bool Config::Init()
-{
-	bool success = false;
+Config::~Config() {
+	int rc = sqlite3_close(mDbHandle);
+	if (rc != SQLITE_OK)
+		cerr << __LINE__ << " data base was not closed correctly" << endl;
+}
+
+bool Config::init() {
+	return loadParams();
+}
+
+bool Config::populateStdParams() {
 	mParamList.clear();
 
 	/* TODO set standard parameters */
-	mParamList.push_back(Parameter("framesize_x", "int", "640"));
-	mParamList.push_back(Parameter("framesize_y", "int", "480"));
-	mParamList.push_back(Parameter("roi_x", "int", "320"));
-	mParamList.push_back(Parameter("roi_y", "int", "240"));
-	mParamList.push_back(Parameter("confidence", "int", "5"));
-	mParamList.push_back(Parameter("same_velocity", "real", "0.2"));
+	mParamList.push_back(Parameter("framesize_x", "int", "320"));
+	mParamList.push_back(Parameter("framesize_y", "int", "240"));
+	// region of interest
+	mParamList.push_back(Parameter("roi_x", "int", "80"));
+	mParamList.push_back(Parameter("roi_y", "int", "80"));
+	mParamList.push_back(Parameter("roi_width", "int", "180"));
+	mParamList.push_back(Parameter("roi_height", "int", "80"));
+	// blob assignment
+	mParamList.push_back(Parameter("blob_area_min", "int", "200"));
+	mParamList.push_back(Parameter("blob_area_max", "int", "20000"));
+	// track assignment
+	mParamList.push_back(Parameter("track_max_confidence", "int", "5"));
+	mParamList.push_back(Parameter("track_max_distance", "double", "30"));
+	mParamList.push_back(Parameter("track_max_deviation", "double", "80"));
+	// grouping tracks to vehicles
+	mParamList.push_back(Parameter("max_n_of_tracks", "int", "9")); // maxNoIDs
+	mParamList.push_back(Parameter("group_min_confidence", "int", "3")); // confCreate
+	mParamList.push_back(Parameter("group_distance", "int", "30")); // distSubTrack
+	mParamList.push_back(Parameter("group_min_velocity", "double", "3")); // minL2NormVelocity
+	
+	return true;
+}
 
+bool Config::openDb(string& dbFile) {
+	bool success = false;
 
 	/* set working dir, db file and config table, compose working path */
-	mDbFile = "carcounter.sqlite";
+	if (dbFile == "")
+		mDbFile = "carcounter.sqlite";
+	else mDbFile = dbFile;
+	
 	mWorkDir = "count_traffic";
 	mDbTblConfig = "config";
 	mDbPath = appendDirToPath(getHome(), mWorkDir);
 
-	if (!PathExists(mDbPath))
-		if (!MakePath(mDbPath))
-		{
+	if (!pathExists(mDbPath))
+		if (!makePath(mDbPath)) {
 			cerr << __LINE__ << " cannot create working directory" << endl;
 			cerr << GetLastError() << endl;
 			return false;
-		}
+		};
 
-
-	/* load actual parameters from file */
-	string strDebug = mDbPath+mDbFile;
-
-	sqlite3* mDbHandle = openDb(mDbPath+mDbFile);
-	if (mDbHandle == NULL)
+	string fullPath = mDbPath + mDbFile;
+	
+	/* open db and get handle */
+	int rc = sqlite3_open(fullPath.c_str(), &mDbHandle);
+	if (rc == SQLITE_OK)
+		success = true;
+	else {
+		cerr << __LINE__ << " error opening " << mDbPath << endl;
+		cerr << __LINE__ << " " << sqlite3_errmsg(mDbHandle) << endl;
+		sqlite3_close(mDbHandle);
+		mDbHandle = NULL;
 		success = false;
-	else
-		success = LoadParams(mDbHandle);
-
+	}
 	return success;
 }
 
-bool Config::LoadParams(sqlite3* db)
-{
+bool Config::loadParams() {
 	bool success = false;
 	stringstream ss;
 	string sqlCreate, sqlRead, sqlinsert;
@@ -98,7 +121,7 @@ bool Config::LoadParams(sqlite3* db)
 	ss.str("");
 	ss << "create table if not exists " << mDbTblConfig << " (name text, type text, value text);";
 	sqlCreate = ss.str();
-	success = queryDbSingle(sqlCreate, db, noRet);
+	success = queryDbSingle(sqlCreate, noRet);
 
 
 	list<Parameter>::iterator iParam = mParamList.begin();
@@ -109,9 +132,8 @@ bool Config::LoadParams(sqlite3* db)
 		ss << "select value from " << mDbTblConfig << " where name=" << "'" << iParam->getName() << "';"; 
 		sqlRead = ss.str();
 		string strValue;
-		success = queryDbSingle(sqlRead, db, strValue);
-		cout << setw(10) << "standard: " << setw(14) << iParam->getName() << setw(4) << iParam->getValue();
-		//TODO: new params
+		success = queryDbSingle(sqlRead, strValue);
+
 		if (success && !strValue.empty()) // use parameter value from db
 			iParam->setValue(strValue);
 		else // use standard parameter value and insert new record into db
@@ -120,150 +142,19 @@ bool Config::LoadParams(sqlite3* db)
 			ss << "insert into " << mDbTblConfig << " values ('" << iParam->getName() << "', '" << iParam->getType() << "', '" << iParam->getValue() << "');";
 			sqlinsert = ss.str();
 			strValue = iParam->getValue();
-			success =  queryDbSingle(sqlinsert, db, noRet);
+			success =  queryDbSingle(sqlinsert, noRet);
 		}
-		cout << setw(12) << "  database: " << setw(14) << iParam->getName() << setw(4) << iParam->getValue() << endl;
 		++iParam;
 	}
 
 	return success;
 }
 
-
-// Directory manipulation functions
-string getHome()
-{
-	string home;
-	#if defined (_WIN32)
-		char *pHomeDrive, *pHomePath;
-		pHomeDrive = getenv("HOMEDRIVE");
-		if (pHomeDrive != 0)
-			home += pHomeDrive;
-		pHomePath = getenv("HOMEPATH");
-		if (pHomePath !=0)
-			home = appendDirToPath(home, string(pHomePath));
-	#elif defined (__linux__)
-		char *pHome;
-		pHomePath = getenv("HOME");
-		if (pHome !=0)
-		{
-			home += pHome;
-			home += '/';
-		}
-	#else
-		throw 1;
-	#endif
-	
-	return home;
-}
-
-string& appendDirToPath(string& path, string& dir)
-{
-	path += dir;
-	#if defined (_WIN32)
-			path += '\\';
-	#elif defined (__linux__)
-			path += '/';
-	#else
-		throw 1;
-	#endif
-	return path;
-}
-
-bool PathExists(string& path)
-{
-	#if defined (_WIN32)
-		wstring wPath;
-		wPath.assign(path.begin(), path.end());
-
-		DWORD fileAttrib = GetFileAttributes(wPath.c_str());
-		if (fileAttrib == INVALID_FILE_ATTRIBUTES)
-		{
-			DWORD lastError = GetLastError();
-			if (lastError != ERROR_FILE_NOT_FOUND && lastError != ERROR_PATH_NOT_FOUND)
-				throw 3;
-			return false;
-		}
-		else
-			return true;
-	#elif defined (__linux__)
-		// TODO use stat from <sys/stat.h>
-		throw 2;
-	#else
-		throw 1;
-	#endif
-}
-
-bool MakeDir(string& dir)
-{
-	#if defined (_WIN32)
-		wstring wDir;
-		wDir.assign(dir.begin(), dir.end());
-
-		if (CreateDirectory(wDir.c_str(), 0))
-			return true;
-		DWORD error = GetLastError();
-		if (GetLastError() == ERROR_ALREADY_EXISTS)
-			return true;
-		else 
-			return false;
-	#elif defined (__linux__)
-		// TODO use mkdir from <unistd.h>
-		throw 2;
-	#else
-		throw 1;
-	#endif
-}
-
-bool MakePath(string& path)
-{
-	#if defined (_WIN32)
-		char delim = '\\';
-	#elif defined (__linux__)
-		char delim = '/';
-	#else
-		throw 1;
-	#endif
-	bool success = true;
-	size_t pos = 0;
-
-	// path must end with delim character
-	if (path.back() != delim)
-		path += delim;
-
-	pos = path.find_first_of(delim);
-	while (success == true && pos != string::npos)
-	{
-		if (pos != 0)
-			success = MakeDir(path.substr(0, pos));
-		++pos;
-		pos = path.find_first_of(delim, pos);
-	}
-	return success;
-}
-
-// DB functions
-sqlite3* openDb(const string& fullPath)
-{
-	sqlite3 *db;
-
-	int rc = sqlite3_open(fullPath.c_str(), &db);
-	if (rc != SQLITE_OK)
-	{
-		cerr << __LINE__ << " error opening " << fullPath << endl;
-		cerr << __LINE__ << " " << sqlite3_errmsg(db) << endl;
-		sqlite3_close(db);
-		db = NULL;
-	}
-	return db;
-}
-
-bool queryDbSingle(const string& sql, sqlite3* db, string& value)
-{
+bool Config::queryDbSingle(const string& sql, string& value) {
 	bool success = false;
 	sqlite3_stmt *stmt;
 
-	int rc = sqlite3_prepare_v2(db, sql.c_str(), -1, &stmt, 0);
+	int rc = sqlite3_prepare_v2(mDbHandle, sql.c_str(), -1, &stmt, 0);
 	if (rc == SQLITE_OK)
 	{
 		int step = SQLITE_ERROR;
@@ -304,9 +195,122 @@ bool queryDbSingle(const string& sql, sqlite3* db, string& value)
 
 	else // sqlite3_prepare != OK
 	{
-		cerr << "SQL error: " << sqlite3_errmsg(db) << endl;
+		cerr << "SQL error: " << sqlite3_errmsg(mDbHandle) << endl;
 		rc = sqlite3_finalize(stmt);
 		success = false;
+	}
+	return success;
+}
+
+Config::getDouble() {
+	// find parameter string
+	// getDouble
+}
+
+
+// Directory manipulation functions
+string getHome() {
+	string home;
+	#if defined (_WIN32)
+		char *pHomeDrive, *pHomePath;
+		pHomeDrive = getenv("HOMEDRIVE");
+		if (pHomeDrive != 0)
+			home += pHomeDrive;
+		pHomePath = getenv("HOMEPATH");
+		if (pHomePath !=0)
+			home = appendDirToPath(home, string(pHomePath));
+	#elif defined (__linux__)
+		char *pHome;
+		pHomePath = getenv("HOME");
+		if (pHome !=0)
+		{
+			home += pHome;
+			home += '/';
+		}
+	#else
+		throw 1;
+	#endif
+	
+	return home;
+}
+
+string& appendDirToPath(string& path, string& dir) {
+	path += dir;
+	#if defined (_WIN32)
+			path += '\\';
+	#elif defined (__linux__)
+			path += '/';
+	#else
+		throw 1;
+	#endif
+	return path;
+}
+
+bool pathExists(string& path) {
+	#if defined (_WIN32)
+		wstring wPath;
+		wPath.assign(path.begin(), path.end());
+
+		DWORD fileAttrib = GetFileAttributes(wPath.c_str());
+		if (fileAttrib == INVALID_FILE_ATTRIBUTES)
+		{
+			DWORD lastError = GetLastError();
+			if (lastError != ERROR_FILE_NOT_FOUND && lastError != ERROR_PATH_NOT_FOUND)
+				throw 3;
+			return false;
+		}
+		else
+			return true;
+	#elif defined (__linux__)
+		// TODO use stat from <sys/stat.h>
+		throw 2;
+	#else
+		throw 1;
+	#endif
+}
+
+bool makeDir(string& dir) {
+	#if defined (_WIN32)
+		wstring wDir;
+		wDir.assign(dir.begin(), dir.end());
+
+		if (CreateDirectory(wDir.c_str(), 0))
+			return true;
+		DWORD error = GetLastError();
+		if (GetLastError() == ERROR_ALREADY_EXISTS)
+			return true;
+		else 
+			return false;
+	#elif defined (__linux__)
+		// TODO use mkdir from <unistd.h>
+		throw 2;
+	#else
+		throw 1;
+	#endif
+}
+
+bool makePath(string& path) {
+	#if defined (_WIN32)
+		char delim = '\\';
+	#elif defined (__linux__)
+		char delim = '/';
+	#else
+		throw 1;
+	#endif
+	bool success = true;
+	size_t pos = 0;
+
+	// path must end with delim character
+	if (path.back() != delim)
+		path += delim;
+
+	pos = path.find_first_of(delim);
+	while (success == true && pos != string::npos)
+	{
+		if (pos != 0)
+			success = makeDir(path.substr(0, pos));
+		++pos;
+		pos = path.find_first_of(delim, pos);
 	}
 	return success;
 }

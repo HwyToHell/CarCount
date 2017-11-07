@@ -7,12 +7,10 @@ car counter using opencv
 - tracks observations and counts cars
 
 /// TODO
+[2017-11-02]
+done: create sqlite3/bin /inc /lib /src for std setup (comparable to linux)
+done: create all params in Config::Init
+setup test cases
+
 [2017-10-15] 
-load params from sqlite file out of home dir
-params: framesize(x,y), background subtractor params,
-max # of tracks, max # of vehicles,
-window (velocity and position for associating blobs with tracks,
-track confidence
-file: config.sqlite
-read from $HOME
-if file not present or no parameters set --> use standard
+done: load params from sqlite file out of home dir

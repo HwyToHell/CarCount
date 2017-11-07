@@ -239,7 +239,6 @@ list<TrackEntry> FindShapes(const cv::Mat& mask, cv::Mat& frame)
 	/// implement ROI as parameter in scene
 	const cv::Rect sceneROI(80, 80, 180, 80);
 
-
 	vector<vector<cv::Point> > contours;
 	vector<cv::Vec4i> hierarchy;
 	list<TrackEntry> newShapes; // stores new identified objects, that have not been assigned to tracks yet

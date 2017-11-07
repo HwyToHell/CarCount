@@ -53,13 +53,13 @@ private:
 	bool assigned;
 	cv::Point2d avgVelocity;
 	std::vector<TrackEntry> history; // dimension: time
-
 	void UpdateAvgVelocity();
+	// TODO function HasSimilarSize should be moved to class TrackEntry
 	bool HasSimilarSize(TrackEntry& blob);
 };
 
 
-
+// TODO delete vehicle representation
 // vehicle representation
 class Vehicle {
 public:
