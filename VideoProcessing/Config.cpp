@@ -5,25 +5,13 @@ using namespace std;
 
 Parameter::Parameter(string name, string type, string value) : mName(name), mType(type), mValue(value) {}
 
-string Parameter::getName() {
-	return mName;
-}
+string Parameter::getName() const { return mName; }
 
-string Parameter::getType() {
-	return mType;
-}
+string Parameter::getType() const { return mType; }
 
-string Parameter::getValue() {
-	return mValue;
-}
+string Parameter::getValue() const { return mValue; }
 
-double Parameter::getDouble() {
-	return stod(mValue);
-}
-
-int Parameter::getInt() {
-	return stoi(mValue);
-}
+double Parameter::getDouble() const { return stod(mValue); }
 
 bool Parameter::setValue(string& value) {
 	mValue = value;
@@ -76,7 +64,12 @@ bool Config::populateStdParams() {
 	return true;
 }
 
-bool Config::openDb(string& dbFile) {
+bool Config::insertParam(Parameter param) {
+	mParamList.push_back(param);
+	return true;
+}
+
+bool Config::openDb(string dbFile) {
 	bool success = false;
 
 	/* set working dir, db file and config table, compose working path */
@@ -202,9 +195,18 @@ bool Config::queryDbSingle(const string& sql, string& value) {
 	return success;
 }
 
-Config::getDouble() {
-	// find parameter string
-	// getDouble
+class Param_eq : public unary_function<Parameter, bool> {
+	string mName;
+public: 
+	Param_eq (const string& name) : mName(name) {}
+	bool operator() (const Parameter& par) const { 
+		return (mName == par.getName());
+	}
+};
+
+double Config::getDouble(string name) {
+	list<Parameter>::iterator iParam = find_if(mParamList.begin(), mParamList.end(), Param_eq(name));
+	return (iParam->getDouble());
 }
 
 

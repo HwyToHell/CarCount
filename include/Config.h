@@ -2,13 +2,11 @@
 class Parameter {
 public:
 	Parameter(std::string name = "name", std::string type = "type", std::string value = "value");
-	std::string getName();
-	std::string getType();
-	std::string getValue();
-	double getDouble();
-	int getInt();
+	std::string getName() const;
+	std::string getType() const;
+	std::string getValue() const;
+	double getDouble() const;
 	bool setValue(std::string& value);
-
 private:
 	std::string mName;
 	std::string mType;
@@ -21,8 +19,9 @@ public:
 	~Config();
 	bool init();
 	bool populateStdParams();
-	bool openDb(std::string& dbFile);
-	bool queryDbSingle(const std::string& sql, std::string&);
+	bool insertParam(Parameter param);
+	bool openDb(std::string dbFile);
+	bool queryDbSingle(const std::string& sql, std::string& value);
 	double getDouble(std::string name);
 
 private:

@@ -11,6 +11,8 @@ int main(int argc, char *argv[])
 {
 	Config cfgstr("test.sqlite");
 	Config cfg;
+
+	double roi_x = cfg.getDouble("roi_x");
 	
 	cout << endl << "hit enter to exit";
 	string str;
