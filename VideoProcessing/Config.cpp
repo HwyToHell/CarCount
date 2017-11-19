@@ -59,7 +59,7 @@ bool Config::populateStdParams() {
 	mParamList.push_back(Parameter("max_n_of_tracks", "int", "9")); // maxNoIDs
 	mParamList.push_back(Parameter("group_min_confidence", "int", "3")); // confCreate
 	mParamList.push_back(Parameter("group_distance", "int", "30")); // distSubTrack
-	mParamList.push_back(Parameter("group_min_velocity", "double", "3")); // minL2NormVelocity
+	mParamList.push_back(Parameter("group_min_velocity", "double", "3")); // minVelocityL2Norm
 	
 	return true;
 }

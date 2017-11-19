@@ -137,10 +137,10 @@ int _main(int argc, char* argv[])
 		cv::imshow("MOG2+Dilate", fDilate);
 		cv::putText(fgMask, to_string((long long)cnt), cv::Point(10,35), 0, 1.0, cv::Scalar(127, 127, 127), 2);
 		newBlobs = FindShapes(fDilate, frame);	
-		sceneMOG.UpdateTracks(newBlobs);
-		sceneMOG.ShowTracks(frame);
-		sceneMOG.CombineTracks();
-		sceneMOG.ShowVehicles(frame);
+		sceneMOG.updateTracks(newBlobs);
+		sceneMOG.showTracks(frame);
+		sceneMOG.combineTracks();
+		sceneMOG.showVehicles(frame);
 		imshow("Detect", frame);
 
 		/*// Vibe
@@ -150,10 +150,10 @@ int _main(int argc, char* argv[])
 		cv::dilate(bgrVibe, bgrVibe, cv::Mat(11,11,CV_8UC1,1), cvPoint(-1,-1),1);
 		cv::imshow("Vibe+Dilate", bgrVibe);
 		newBlobsVibe = FindShapes(bgrVibe);
-		sceneVibe.UpdateTracks(newBlobsVibe);
-		sceneVibe.ShowTracks(frameVibe);
-		sceneVibe.CombineTracks();
-		sceneVibe.ShowVehicles(frameVibe);
+		sceneVibe.updateTracks(newBlobsVibe);
+		sceneVibe.showTracks(frameVibe);
+		sceneVibe.combineTracks();
+		sceneVibe.showVehicles(frameVibe);
 		
 		
 		// FrameDiff
@@ -168,12 +168,12 @@ int _main(int argc, char* argv[])
 		// update tracks from contours, return moving contours
 		vector<vector<cv::Point> > contours, movingContours; vector<cv::Vec4i> hierarchy;
 		cv::findContours(maskDiff, contours, hierarchy, CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE, cv::Point(0,0));
-		sceneDiff.UpdateTracksFromContours(contours, movingContours);
-		sceneDiff.ShowTracks(frame);
-		sceneDiff.CombineTracks();
+		sceneDiff.updateTracksFromContours(contours, movingContours);
+		sceneDiff.showTracks(frame);
+		sceneDiff.combineTracks();
 		bgsFrameDiff.updateBg(sceneDiff, contours, bgrDiff);
 		cv::imshow("FrameDiff Background", bgrDiff); // bgrDiff can only be shown after update background
-		sceneDiff.ShowVehicles(frame);
+		sceneDiff.showVehicles(frame);
 		cv::imshow("FrameDiff Org", frame);
 		*/
 		
@@ -270,7 +270,7 @@ list<TrackEntry> FindShapes(const cv::Mat& mask, cv::Mat& frame)
 	while (it != newShapes.end()) 
 	{
 
-		cv::Rect boxPos(it->bbox.x-2, it->bbox.y-2, it->bbox.width+4, it->bbox.height+4);
+		cv::Rect boxPos(it->mBbox.x-2, it->mBbox.y-2, it->mBbox.width+4, it->mBbox.height+4);
 		cv::rectangle(frame, boxPos, blue, thickness);
 		++it;
 	}

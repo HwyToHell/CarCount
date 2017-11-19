@@ -43,7 +43,7 @@ cv::BackgroundSubtractorMOG2 MOG2::bs = cv::BackgroundSubtractorMOG2(); // defin
 
 void MOG2::initPar()
 {
-	parList.push_back(Parameter("history", 100, 50, 500, 9)); // std: 500 
+	parList.push_back(Parameter("mHistory", 100, 50, 500, 9)); // std: 500 
 	parList.push_back(Parameter("varThreshold", 15, 10, 100, 18)); // std: 16 --> use 25
 	parList.push_back(Parameter("nmixtures", 3, 3, 7, 4)); // std: 5
 	parList.push_back(Parameter("backgroundRatio", 0.9, 0.5, 1, 5)); // std: 0.9

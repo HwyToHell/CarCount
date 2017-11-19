@@ -3,27 +3,29 @@
 
 // TODO delete vehicle representation
 Vehicle::Vehicle(cv::Rect _bbox, cv::Point2d _velocity, std::vector<int> _contourIndices) 
-	: bbox(_bbox), velocity(_velocity), contourIndices(_contourIndices), confAssign(3), confVisible(4)
+	: mBbox(_bbox), mVelocity(_velocity), mContourIndices(_contourIndices), mConfAssign(3), mConfVisible(4)
 {
-	centroid.x = bbox.x + (bbox.width / 2);
-	centroid.y = bbox.y + (bbox.height / 2);
+	mCentroid.x = mBbox.x + (mBbox.width / 2);
+	mCentroid.y = mBbox.y + (mBbox.height / 2);
 }
 
 
 
 
 
-cv::Rect Vehicle::GetBbox()
+cv::Rect Vehicle::getBbox()
 {
-	return bbox;
+	return mBbox;
 }
 
-cv::Point2i Vehicle::GetCentroid()
+cv::Point2i Vehicle::getCentroid()
 {
-	return centroid;
+	return mCentroid;
 }
 
-cv::Point2d Vehicle::GetVelocity()
+cv::Point2d Vehicle::getVelocity()
 {
-	return velocity;
+	return mVelocity;
 }
+
+void Vehicle::update() {}
