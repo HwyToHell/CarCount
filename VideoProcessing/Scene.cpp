@@ -1,15 +1,32 @@
 #include "stdafx.h"
-#include "../include/Tracking.h"
+#include "../include/config.h"
+#include "../include/tracking.h"
 
-Scene::Scene() : mConfCreate(3), mMaxNoIDs(9), trafficFlowUnitVec(1,0)
+Scene::Scene(Config* pConfig) : mConfig(pConfig)
 {
-	for (int i = mMaxNoIDs; i > 0; --i) // fill trackIDs with 9 ints
-		mTrackIDs.push_back(i);
-	mDistSubTrack = 30;	//--> maximum distance for grouping between bounding boxes of tracks
-	mMinVelocityL2Norm = 0.5;
+	pullConfig();
+}
 
-	mBlobArea.min = 200; //320x240=100 640x480=500
-	mBlobArea.max = 20000; //320x240=10000 640x480=60000
+void Scene::pullConfig()
+{
+	mBlobArea.min = (int)mConfig->getDouble("blob_area_min");
+	mBlobArea.max = (int)mConfig->getDouble("blob_area_max");
+	mConfCreate = (int)mConfig->getDouble("group_min_confidence");
+	mDistSubTrack = (int)mConfig->getDouble("group_distance");
+	mMaxNoIDs = (int)mConfig->getDouble("max_n_of_tracks");
+	mMinVelocityL2Norm = mConfig->getDouble("group_min_velocity");
+	mTrafficFlow.x = mConfig->getDouble("traffic_flow_x");
+	mTrafficFlow.y = mConfig->getDouble("traffic_flow_y");
+	// mBlobArea.min(200)		-> smaller blobs will be discarded 320x240=100   640x480=500
+	// mBlobArea.max(20000)		-> larger blobs will be discarded  320x240=10000 640x480=60000
+	// mConfCreate(3)			-> confidence above this level creates vehicles from unassigned tracks
+	// mDistSubTrack(30)		-> max distance for grouping between bounding boxes of tracks
+	// mMaxNoIDs(9)				-> max number of tracks
+	// mMinVelocityL2Norm(0.5)	-> slower tracks won't be grouped
+	// mTrafficFlow.x(1)		-> horizontal component of traffic flow (normalized)
+	// mTrafficFlow.y(0)		-> vertical component of traffic flow (normalized)
+	for (int i = mMaxNoIDs; i > 0; --i) // fill trackIDs with 9 ints
+	mTrackIDs.push_back(i);
 }
 
 // update tracks from blobs and erase, if marked for deletion
@@ -149,11 +166,11 @@ bool Scene::HaveSimilarVelocityVector(Track& track1, Track& track2)
 	cv::Point2d vel1 = track1.getVelocity();
 	cv::Point2d vel2 = track2.getVelocity();
 
-	double vel1_DotTraffic = trafficFlowUnitVec.ddot(vel1);
-	double cosPhiVel1 = vel1_DotTraffic / cv::norm(vel1) / cv::norm(trafficFlowUnitVec);
+	double vel1_DotTraffic = mTrafficFlow.ddot(vel1);
+	double cosPhiVel1 = vel1_DotTraffic / cv::norm(vel1) / cv::norm(mTrafficFlow);
 
-	double vel2_DotTraffic = trafficFlowUnitVec.ddot(vel2);
-	double cosPhiVel2 = vel2_DotTraffic / cv::norm(vel2) / cv::norm(trafficFlowUnitVec);
+	double vel2_DotTraffic = mTrafficFlow.ddot(vel2);
+	double cosPhiVel2 = vel2_DotTraffic / cv::norm(vel2) / cv::norm(mTrafficFlow);
 
 	if (signBit(vel1_DotTraffic) != signBit(vel2_DotTraffic))
 		return false; // opposite direction
@@ -215,7 +232,7 @@ void Scene::combineTracks()
 		// ToDo: creating a fgMask from contours fails, if substitute values for blobs were calculated (conf < maxConf)
 		// in this case track entry must not assigned to idxContour 
 		if ((conf > 5) && isMoving)
-			pTracks.push_back(tr->GetThis());
+			pTracks.push_back(tr->getThis());
 		++tr;
 	}
 
@@ -234,6 +251,13 @@ void Scene::combineTracks()
 		{
 			bool hasSimilarVelocity = HaveSimilarVelocityVector(*vCombTracks[idx].back(), **pTr);
 			bool isClose = AreClose(*vCombTracks[idx].back(), (**pTr));
+			/// TODO test alternative
+			double direction = 0.1;
+			double norm = 0.5;
+			hasSimilarVelocity = (**pTr).hasSimilarVelocityVector(*vCombTracks[idx].back(), direction, norm);
+			isClose = (**pTr).isClose(*vCombTracks[idx].back(), mDistSubTrack);
+			/// end test alternative
+
 
 			if (hasSimilarVelocity && isClose)
 			{

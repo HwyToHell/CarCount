@@ -1,6 +1,5 @@
 #include "stdafx.h"
-#include "../include/Tracking.h"
-#include "../include/Parameters.h"
+#include "../include/tracking.h"
 
 
 double EuclideanDist(cv::Point& pt1, cv::Point& pt2)
@@ -43,7 +42,7 @@ bool TrackEntry::hasSimilarSize(TrackEntry& teCompare, double maxDeviation)
 
 
 // track vector
-Track::Track(TrackEntry& blob, int id) : mMaxDist(30), mMaxDeviation(80), mMaxConfidence(6), mTrafficFlowUnitVec(1,0),
+Track::Track(TrackEntry& blob, int id) : mMaxDist(30), mMaxDeviation(80), mMaxConfidence(6), mTrafficFlow(1,0),
 	mId(id), mConfidence(0), mIdxCombine(0), mMarkedForDelete(false), mAvgVelocity(0,0)
 {
 	// const criteria for blob assignment
@@ -58,7 +57,7 @@ Track& Track::operator= (const Track& source) {
 	return *this;
 }
 
-Track* Track::GetThis() {
+Track* Track::getThis() {
 	return this;
 }
 
@@ -105,8 +104,6 @@ int Track::getIdxCombine() {return mIdxCombine;}
 
 cv::Point2d Track::getVelocity() {return mAvgVelocity;}
 
-bool Track::isAssigned() {return mAssigned;}
-
 bool Track::hasSimilarVelocityVector(Track& track2, double directionDiff, double normDiff) {
 	// directionDiff:	max difference of direction 
 	//						0 = must have same direction (cos phi = 1)
@@ -131,11 +128,11 @@ bool Track::hasSimilarVelocityVector(Track& track2, double directionDiff, double
 	cv::Point2d vel1 = getVelocity();
 	cv::Point2d vel2 = track2.getVelocity();
 
-	double vel1_DotTraffic = mTrafficFlowUnitVec.ddot(vel1);
-	double cosPhiVel1 = vel1_DotTraffic / cv::norm(vel1) / cv::norm(mTrafficFlowUnitVec);
+	double vel1_DotTraffic = mTrafficFlow.ddot(vel1);
+	double cosPhiVel1 = vel1_DotTraffic / cv::norm(vel1) / cv::norm(mTrafficFlow);
 
-	double vel2_DotTraffic = mTrafficFlowUnitVec.ddot(vel2);
-	double cosPhiVel2 = vel2_DotTraffic / cv::norm(vel2) / cv::norm(mTrafficFlowUnitVec);
+	double vel2_DotTraffic = mTrafficFlow.ddot(vel2);
+	double cosPhiVel2 = vel2_DotTraffic / cv::norm(vel2) / cv::norm(mTrafficFlow);
 
 	if (signBit(vel1_DotTraffic) != signBit(vel2_DotTraffic))
 		return false; // opposite direction
@@ -150,6 +147,8 @@ bool Track::hasSimilarVelocityVector(Track& track2, double directionDiff, double
 	else
 		return false;
 }
+
+bool Track::isAssigned() {return mAssigned;}
 
 bool Track::isClose(Track& track2, int maxDist) {
 	int dist_x = maxDist; // default: 30

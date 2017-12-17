@@ -3,6 +3,7 @@
 
 using namespace std;
 
+
 Parameter::Parameter(string name, string type, string value) : mName(name), mType(type), mValue(value) {}
 
 string Parameter::getName() const { return mName; }
@@ -33,6 +34,13 @@ Config::~Config() {
 		cerr << __LINE__ << " data base was not closed correctly" << endl;
 }
 
+bool Config::attachScene(Scene* pScene) {
+	if (pScene == NULL)
+		return false;
+	mScene = pScene;
+	return true;
+}
+
 bool Config::init() {
 	return loadParams();
 }
@@ -59,15 +67,25 @@ bool Config::populateStdParams() {
 	mParamList.push_back(Parameter("max_n_of_tracks", "int", "9")); // maxNoIDs
 	mParamList.push_back(Parameter("group_min_confidence", "int", "3")); // confCreate
 	mParamList.push_back(Parameter("group_distance", "int", "30")); // distSubTrack
-	mParamList.push_back(Parameter("group_min_velocity", "double", "3")); // minVelocityL2Norm
-	
+	mParamList.push_back(Parameter("group_min_velocity", "double", "0.5")); // minVelocityL2Norm
+	// traffic flow
+	mParamList.push_back(Parameter("traffic_flow_x", "double", "1")); // traffic flow horizontal
+	mParamList.push_back(Parameter("traffic_flow_y", "double", "0")); // traffic flow horizontal
+		
 	return true;
 }
+
 
 bool Config::insertParam(Parameter param) {
 	mParamList.push_back(param);
 	return true;
 }
+
+bool Config::notifyScene() {
+	mScene->pullConfig();
+	return true;
+}
+
 
 bool Config::openDb(string dbFile) {
 	bool success = false;
@@ -207,6 +225,14 @@ public:
 double Config::getDouble(string name) {
 	list<Parameter>::iterator iParam = find_if(mParamList.begin(), mParamList.end(), Param_eq(name));
 	return (iParam->getDouble());
+}
+
+bool Config::changeParam(string name, string value) {
+	list<Parameter>::iterator iParam = find_if(mParamList.begin(), mParamList.end(), Param_eq(name));
+	if (iParam == mParamList.end())
+		return false;
+	iParam->setValue(value);
+	return true;
 }
 
 

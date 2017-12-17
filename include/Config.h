@@ -1,3 +1,6 @@
+#pragma once
+
+#include "tracking.h"
 
 class Parameter {
 public:
@@ -6,6 +9,7 @@ public:
 	std::string getType() const;
 	std::string getValue() const;
 	double getDouble() const;
+	int getInt() const;
 	bool setValue(std::string& value);
 private:
 	std::string mName;
@@ -14,16 +18,6 @@ private:
 };
 
 class Config {
-public:
-	Config(std::string dbFileName = "");
-	~Config();
-	bool init();
-	bool populateStdParams();
-	bool insertParam(Parameter param);
-	bool openDb(std::string dbFile);
-	bool queryDbSingle(const std::string& sql, std::string& value);
-	double getDouble(std::string name);
-
 private:
 	sqlite3* mDbHandle;
 	std::string mDbFile;
@@ -32,12 +26,27 @@ private:
 	std::string mDbTblConfig;
 	std::string mDbTblData; // table for time series
 	std::list<Parameter> mParamList;
+	Scene* mScene; // Observer
 
 	// TODO 
 	// loadParam("all" - load all, "name" - load only param 'name')
+	bool notifyScene();	
 	bool loadParams();
 	bool saveParams();
+	bool openDb(std::string dbFile);
+	bool queryDbSingle(const std::string& sql, std::string& value);
+
+public:
+	Config(std::string dbFileName = "");
+	~Config();
+	bool attachScene(Scene* pScene);
+	bool init();
+	bool populateStdParams();
+	bool changeParam(std::string name, std::string value);
+	bool insertParam(Parameter param);
+	double getDouble(std::string name);
 };
+
 
 // Directory manipulation functions
 std::string getHome();
