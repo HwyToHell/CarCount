@@ -1,4 +1,5 @@
 #pragma once
+#include "observer.h"
 
 // helper functions
 double EuclideanDist(cv::Point& pt1, cv::Point& pt2);
@@ -6,8 +7,6 @@ double round(double number); // not necessary in C++11
 inline bool signBit(double x) {return (x < 0) ? true : false;} // use std signbit in C++11
 
 class Config;
-class Observer;
-
 
 // representation for a blob (detected geometric moving object) in the track vector 
 class TrackEntry {
@@ -28,6 +27,21 @@ public:
 
 // a time sequence of the same shape (track), with the history of the shape occurances
 class Track {
+private:
+	const double mMaxDist;
+	const double mMaxDeviation;
+	const int mMaxConfidence;
+	cv::Point2d mAvgVelocity;
+	bool mAssigned;
+	int mConfidence;
+	std::vector<TrackEntry> mHistory; // dimension: time
+	int mId;
+	int mIdxCombine;
+	bool mMarkedForDelete;
+	cv::Point2d mTrafficFlow;
+	void updateAvgVelocity();
+	// TODO function HasSimilarSize should be moved to class TrackEntry
+	bool HasSimilarSize(TrackEntry& blob);
 public:
 	Track(TrackEntry& blob, int id = 0);
 	Track& operator= (const Track& source);
@@ -47,25 +61,7 @@ public:
 	void setAssigned(bool state);
 	void setId(int trkID); // delete, if not needed
 	void setIdxCombine(int idx); // delete, if not needed
-	void update(std::list<TrackEntry>& blobs);
-
-
-private:
-	const double mMaxDist;
-	const double mMaxDeviation;
-	const int mMaxConfidence;
-	cv::Point2d mAvgVelocity;
-	bool mAssigned;
-	int mConfidence;
-	std::vector<TrackEntry> mHistory; // dimension: time
-	int mId;
-	int mIdxCombine;
-	bool mMarkedForDelete;
-	cv::Point2d mTrafficFlow;
-	
-	void updateAvgVelocity();
-	// TODO function HasSimilarSize should be moved to class TrackEntry
-	bool HasSimilarSize(TrackEntry& blob);
+	void updateTrack(std::list<TrackEntry>& blobs);
 };
 
 
@@ -89,33 +85,28 @@ public:
 	std::vector<int> mContourIndices;
 };
 
-class Scene {
+class SceneTracker : public Observer {
 private:
-	struct AreaLimits{
-		int min;
-		int max;
-	} mBlobArea;
 	int mConfCreate;	// confidence above this level creates vehicle from unassigned track 
 	int mDistSubTrack;	// ToDo: change to const after testing
 	unsigned int mMaxNoIDs;
 	double mMinVelocityL2Norm; 
 	cv::Rect mRoi; // region of interest = subwindow of frame
 	cv::Point2d mTrafficFlow; // TODO delete after testing Track::hasSimilarVelocityVec
-	Config* mConfig; // Subject to get notifications from
 public:
-	Scene(Config* pConfig);
-	void combineTracks();
+	SceneTracker(Config* pConfig);
+	list<Vehicle>& combineTracks();
 	int nextTrackID();
 	void printVehicles();
-	void pullConfig();
 	bool returnTrackID(int id);
 	void showTracks(cv::Mat& frame);
 	void showVehicles(cv::Mat& frame);
-	void updateTracks(std::list<TrackEntry>& blobs);
+	void update(); // updates observer with subject's parameters (Config)
+	list<Track>& updateTracks(std::list<TrackEntry>& blobs);
 	void updateTracksFromContours(const std::vector<std::vector<cv::Point>>& contours, 
 		std::vector<std::vector<cv::Point>>& movingContours);
 	//std::vector<int> getAllContourIndices();
-	void updateVehicles();  // TODO update all vehicles
+	list<Vehicle>& getVehicles();  // TODO update all vehicles
 
 	bool HaveSimilarVelocityVector(Track& track1, Track& track2); // TODO delete, after testing Track::hasSimilarVelocityVector
 	bool AreClose(Track& track1, Track& track2); // TODO delete, after testing Track::isClose()
@@ -123,6 +114,5 @@ public:
 	// private:
 	std::list<Track> mTracks;
 	std::list<Vehicle> mVehicles;
-	cv::Rect mTrackingWindow; // delete, if not needed
 	std::list<int> mTrackIDs;
 };

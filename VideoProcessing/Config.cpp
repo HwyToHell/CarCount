@@ -3,6 +3,9 @@
 
 using namespace std;
 
+void updateObserver(Observer* pObserver) {
+	pObserver->update();
+}
 
 Parameter::Parameter(string name, string type, string value) : mName(name), mType(type), mValue(value) {}
 
@@ -34,21 +37,23 @@ Config::~Config() {
 		cerr << __LINE__ << " data base was not closed correctly" << endl;
 }
 
-bool Config::attachScene(Scene* pScene) {
-	if (pScene == NULL)
-		return false;
-	mScene = pScene;
-	return true;
-}
 
 bool Config::init() {
 	return loadParams();
+	///TODO move working path logic to here
+	/// store workingPath for db and video files in ParamList
+
 }
 
 bool Config::populateStdParams() {
 	mParamList.clear();
 
 	/* TODO set standard parameters */
+	// TODO parameter for capFileName
+	// capFile, capDevice, framesize
+	mParamList.push_back(Parameter("video_file", "string", "traffic.avi"));
+	mParamList.push_back(Parameter("video_path", "string", "D:/Users/Holger/count_traffic/"));
+	mParamList.push_back(Parameter("video_device", "int", "0"));
 	mParamList.push_back(Parameter("framesize_x", "int", "320"));
 	mParamList.push_back(Parameter("framesize_y", "int", "240"));
 	// region of interest
@@ -60,7 +65,7 @@ bool Config::populateStdParams() {
 	mParamList.push_back(Parameter("blob_area_min", "int", "200"));
 	mParamList.push_back(Parameter("blob_area_max", "int", "20000"));
 	// track assignment
-	mParamList.push_back(Parameter("track_max_confidence", "int", "5"));
+	mParamList.push_back(Parameter("track_max_confidence", "int", "4"));
 	mParamList.push_back(Parameter("track_max_distance", "double", "30"));
 	mParamList.push_back(Parameter("track_max_deviation", "double", "80"));
 	// grouping tracks to vehicles
@@ -80,12 +85,6 @@ bool Config::insertParam(Parameter param) {
 	mParamList.push_back(param);
 	return true;
 }
-
-bool Config::notifyScene() {
-	mScene->pullConfig();
-	return true;
-}
-
 
 bool Config::openDb(string dbFile) {
 	bool success = false;
@@ -213,22 +212,27 @@ bool Config::queryDbSingle(const string& sql, string& value) {
 	return success;
 }
 
-class Param_eq : public unary_function<Parameter, bool> {
+class ParamEquals : public unary_function<Parameter, bool> {
 	string mName;
 public: 
-	Param_eq (const string& name) : mName(name) {}
+	ParamEquals (const string& name) : mName(name) {}
 	bool operator() (const Parameter& par) const { 
 		return (mName == par.getName());
 	}
 };
 
 double Config::getDouble(string name) {
-	list<Parameter>::iterator iParam = find_if(mParamList.begin(), mParamList.end(), Param_eq(name));
+	list<Parameter>::iterator iParam = find_if(mParamList.begin(), mParamList.end(), ParamEquals(name));
 	return (iParam->getDouble());
 }
 
-bool Config::changeParam(string name, string value) {
-	list<Parameter>::iterator iParam = find_if(mParamList.begin(), mParamList.end(), Param_eq(name));
+string Config::getParam(string name) {
+	list<Parameter>::iterator iParam = find_if(mParamList.begin(), mParamList.end(), ParamEquals(name));
+	return (iParam->getValue());
+}
+
+bool Config::setParam(string name, string value) {
+	list<Parameter>::iterator iParam = find_if(mParamList.begin(), mParamList.end(), ParamEquals(name));
 	if (iParam == mParamList.end())
 		return false;
 	iParam->setValue(value);
