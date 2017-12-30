@@ -76,7 +76,12 @@ bool Config::populateStdParams() {
 	// traffic flow
 	mParamList.push_back(Parameter("traffic_flow_x", "double", "1")); // traffic flow horizontal
 	mParamList.push_back(Parameter("traffic_flow_y", "double", "0")); // traffic flow horizontal
-		
+	// counting
+	mParamList.push_back(Parameter("count_pos_x", "int", "90")); // counting position (within roi)
+	mParamList.push_back(Parameter("count_track_length", "int", "20")); // min track length for counting
+	// classification
+	mParamList.push_back(Parameter("truck_width_min", "int", "60")); // classified as truck, if larger
+	mParamList.push_back(Parameter("truck_height_min", "int", "28")); // classified as truck, if larger
 	return true;
 }
 

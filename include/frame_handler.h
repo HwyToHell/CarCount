@@ -35,12 +35,17 @@ private:
 	cv::Mat mFgrMask; // foreground mask of moving objects
 	cv::BackgroundSubtractorMOG2 mMog2;
 	list<TrackEntry> mBBoxes; // bounding boxes of newly detected objects
+	cv::VideoWriter mVideoOut;
 public:
 	FrameHandler(Config* pConfig);
 	std::list<TrackEntry>& calcBBoxes();
 	void drawVehicles(list<Vehicle>& vehicles);
 	bool openCapSource(bool fromFile = true);
+	bool openVideoOut(string fileName);
 	bool segmentFrame();
 	void showFrame(list<Track>& tracks, list<Vehicle>& vehicles);
 	void update(); // updates observer with subject's parameters (Config)
+	void writeFrame();
+	// DEBUG
+	int getCounter();
 };

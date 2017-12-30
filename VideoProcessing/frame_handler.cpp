@@ -82,7 +82,7 @@ bool FrameHandler::openCapSource(bool fromFile) {
 	
 	mFramesize.x = (int)mCapture.get(CV_CAP_PROP_FRAME_WIDTH);
 	mFramesize.y = (int)mCapture.get(CV_CAP_PROP_FRAME_HEIGHT); 
-	
+
 	// roi for new frame size, based on normalized roi
 	mRoi.x = mRoiNorm.x * mFramesize.x; 
 	mRoi.width = mRoiNorm.width * mFramesize.x; 
@@ -109,6 +109,15 @@ bool FrameHandler::openCapSource(bool fromFile) {
 
 	return true;
 }
+
+
+bool FrameHandler::openVideoOut(string fileName) {
+	mVideoOut.open(mCapSource.path + fileName, CV_FOURCC('M','P','4','V'), 10, mFramesize);
+	if (!mVideoOut.isOpened())
+		return false;
+	return true;
+}
+
 
 bool FrameHandler::segmentFrame() {
 		bool isSuccess = mCapture.read(mFrame);
@@ -140,25 +149,40 @@ void FrameHandler::showFrame(list<Track>& tracks, list<Vehicle>& vehicles) {
 		// show frame counter, int font = cnt % 8;
 		cv::putText(mFrame, to_string((long long)mFrameCounter), cv::Point(10,35), 0, 1.0, red, 2);
 		cv::rectangle(mFrame, mRoi, blue);
-		
+		cv::Scalar boxColor = green;
+
 		cv::Rect rec;
-		list<Track>::iterator iTrack = tracks.begin();
-		while (iTrack != tracks.end()){
-			rec = iTrack->getActualEntry().mBbox;
-			rec.x += (int)mRoi.x;
-			rec.y += (int)mRoi.y;
-			cv::rectangle(mFrame, rec, green, 1);
-			++iTrack;
-		}
 		list<Vehicle>::iterator iVehicle = vehicles.begin();
 		while (iVehicle != vehicles.end()){
 			rec = iVehicle->getBbox();
 			rec.x += (int)mRoi.x;
 			rec.y += (int)mRoi.y;
-			cv::rectangle(mFrame, rec, red, 2);
+			//cv::rectangle(mFrame, rec, red, 2);
 			++iVehicle;
+		}
+		list<Track>::iterator iTrack = tracks.begin();
+		while (iTrack != tracks.end()){
+			rec = iTrack->getActualEntry().mBbox;
+			rec.x += (int)mRoi.x;
+			rec.y += (int)mRoi.y;
+			boxColor = green;
+			if (iTrack->getConfidence() > 3)
+				boxColor = orange;
+			if (iTrack->isCounted())
+				boxColor = red;
+			cv::rectangle(mFrame, rec, boxColor, 1);
+			++iTrack;
 		}
 
 
 		cv::imshow(mFrameWndName, mFrame);
+}
+
+
+void FrameHandler::writeFrame() {
+	mVideoOut.write(mFrame);
+}
+
+int FrameHandler::getCounter() {
+	return mFrameCounter;
 }

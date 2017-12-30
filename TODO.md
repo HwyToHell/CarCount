@@ -1,4 +1,10 @@
 /// TODO
+[2017-12-30]
+Track
+- define struct for parameters (maxDist, maxConfidence, trafficFlow)
+- passing parameters when constructing track
+- hold parameters in SceneTracker (update with observer pattern)
+
 [2017-12-27]
 Config::init
 - move workDir logig to here

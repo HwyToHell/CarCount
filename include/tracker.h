@@ -1,8 +1,8 @@
 #pragma once
-#include "observer.h"
+#include "../include/observer.h"
 
 // helper functions
-double EuclideanDist(cv::Point& pt1, cv::Point& pt2);
+double euclideanDist(cv::Point& pt1, cv::Point& pt2);
 double round(double number); // not necessary in C++11
 inline bool signBit(double x) {return (x < 0) ? true : false;} // use std signbit in C++11
 
@@ -34,14 +34,13 @@ private:
 	cv::Point2d mAvgVelocity;
 	bool mAssigned;
 	int mConfidence;
+	bool mCounted;
 	std::vector<TrackEntry> mHistory; // dimension: time
 	int mId;
 	int mIdxCombine;
 	bool mMarkedForDelete;
 	cv::Point2d mTrafficFlow;
 	void updateAvgVelocity();
-	// TODO function HasSimilarSize should be moved to class TrackEntry
-	bool HasSimilarSize(TrackEntry& blob);
 public:
 	Track(TrackEntry& blob, int id = 0);
 	Track& operator= (const Track& source);
@@ -52,13 +51,16 @@ public:
 	int getConfidence();
 	int getId();
 	int getIdxCombine();
+	double getLength();
 	Track* getThis();
 	cv::Point2d getVelocity();
 	bool hasSimilarVelocityVector(Track& track2, double directionDiff, double normDiff); 
 	bool isAssigned(); // delete, if not needed
 	bool isClose(Track& track2, int maxDist); // TODO use maxDist member of Track
+	bool isCounted();
 	bool isMarkedForDelete();
 	void setAssigned(bool state);
+	void setCounted(bool state);
 	void setId(int trkID); // delete, if not needed
 	void setIdxCombine(int idx); // delete, if not needed
 	void updateTrack(std::list<TrackEntry>& blobs);
@@ -85,16 +87,22 @@ public:
 	std::vector<int> mContourIndices;
 };
 
+class CountRecorder;
+
 class SceneTracker : public Observer {
 private:
 	int mConfCreate;	// confidence above this level creates vehicle from unassigned track 
 	int mDistSubTrack;	// ToDo: change to const after testing
 	unsigned int mMaxNoIDs;
-	double mMinVelocityL2Norm; 
+	double mMinVelocityL2Norm;
+	CountRecorder* mRecorder; 
 	cv::Rect mRoi; // region of interest = subwindow of frame
 	cv::Point2d mTrafficFlow; // TODO delete after testing Track::hasSimilarVelocityVec
 public:
 	SceneTracker(Config* pConfig);
+	void attachCountRecorder(CountRecorder* pRecorder);
+	void SceneTracker::countCars();
+	void SceneTracker::countCars2(int frmCnt);
 	list<Vehicle>& combineTracks();
 	int nextTrackID();
 	void printVehicles();
@@ -115,4 +123,8 @@ public:
 	std::list<Track> mTracks;
 	std::list<Vehicle> mVehicles;
 	std::list<int> mTrackIDs;
+	
+	// DEBUG
+	void inspect(int frmCnt);
+
 };
