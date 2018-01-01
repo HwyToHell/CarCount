@@ -487,8 +487,8 @@ public:
 						if ( (width > 60) && (height > 28) ) // "truck_width_min" "truck_height_min"
 							isTruck = true;
 						mRecorder->updateCnt(movesLeft, isTruck);
-						printCount(mFrameCnt, track.getLength(), direction::left);
-						printCount2(mFrameCnt, track.getActualEntry().mBbox.width, track.getActualEntry().mBbox.height);
+						//printCount(mFrameCnt, track.getLength(), direction::left);
+						//printCount2(mFrameCnt, track.getActualEntry().mBbox.width, track.getActualEntry().mBbox.height);
 					}
 				}
 			}
@@ -503,8 +503,8 @@ public:
 						if ( (width > 60) && (height > 28) ) // "truck_width_min" "truck_height_min"
 							isTruck = true;
 						mRecorder->updateCnt(movesLeft, isTruck);
-						printCount(mFrameCnt, track.getLength(), direction::right);
-						printCount2(mFrameCnt, track.getActualEntry().mBbox.width, track.getActualEntry().mBbox.height);
+						//printCount(mFrameCnt, track.getLength(), direction::right);
+						//printCount2(mFrameCnt, track.getActualEntry().mBbox.width, track.getActualEntry().mBbox.height);
 					}
 				}
 			}

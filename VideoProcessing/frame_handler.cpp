@@ -2,6 +2,14 @@
 #include "../include/frame_handler.h"
 
 FrameHandler::FrameHandler(Config* pConfig) : Observer(pConfig), mMog2(100, 25, false) {
+	string inset_path = pConfig->getParam("video_path");
+	inset_path += "inset3.png";
+	cv::Mat inset_org = cv::imread(inset_path);
+	if (!inset_org.data)
+		cerr << "could not open " << inset_path << endl;
+	cv::Size2d size;
+	cv::resize(inset_org, mInset, size, 0.25, 0.25);
+
 	update();
 }
 
@@ -53,10 +61,11 @@ std::list<TrackEntry>& FrameHandler::calcBBoxes() {
 	return mBBoxes;
 }
 
-void FrameHandler::drawVehicles(list<Vehicle>& vehicles) {
-	
-	// draw ROI
-	//cv::rectangle(mFrame, mRoi, blue);
+int FrameHandler::getFrameInfo() {
+	int ch = mFrame.channels();
+	int de = mFrame.depth();
+	int type = mFrame.type();
+	return type;
 }
 
 
@@ -145,35 +154,40 @@ bool FrameHandler::segmentFrame() {
 		return true;
 }
 
-void FrameHandler::showFrame(list<Track>& tracks, list<Vehicle>& vehicles) {
+void FrameHandler::showFrame(list<Track>& tracks, CountResults cr) {
+		// show inset with vehicle icons and arrows
+		mInset.copyTo(mFrame(cv::Rect(0,177, mInset.cols, mInset.rows)));
+		
 		// show frame counter, int font = cnt % 8;
-		cv::putText(mFrame, to_string((long long)mFrameCounter), cv::Point(10,35), 0, 1.0, red, 2);
+		cv::putText(mFrame, to_string((long long)mFrameCounter), cv::Point(10,20), 0, 0.5, green, 1);
 		cv::rectangle(mFrame, mRoi, blue);
 		cv::Scalar boxColor = green;
+		int line = Line::thin;
 
+		// show tracking boxes around vehicles
 		cv::Rect rec;
-		list<Vehicle>::iterator iVehicle = vehicles.begin();
-		while (iVehicle != vehicles.end()){
-			rec = iVehicle->getBbox();
-			rec.x += (int)mRoi.x;
-			rec.y += (int)mRoi.y;
-			//cv::rectangle(mFrame, rec, red, 2);
-			++iVehicle;
-		}
 		list<Track>::iterator iTrack = tracks.begin();
 		while (iTrack != tracks.end()){
 			rec = iTrack->getActualEntry().mBbox;
 			rec.x += (int)mRoi.x;
 			rec.y += (int)mRoi.y;
-			boxColor = green;
+			boxColor = red;
+			line = Line::thin;
 			if (iTrack->getConfidence() > 3)
 				boxColor = orange;
-			if (iTrack->isCounted())
-				boxColor = red;
-			cv::rectangle(mFrame, rec, boxColor, 1);
+			if (iTrack->isCounted()) {
+				boxColor = green;
+				line = Line::thick;
+			}
+			cv::rectangle(mFrame, rec, boxColor, line);
 			++iTrack;
 		}
 
+		// show vehicle counter
+		cv::putText(mFrame, to_string((long long)cr.carLeft), cv::Point(125,206), 0, 0.5, green, 2);
+		cv::putText(mFrame, to_string((long long)cr.truckLeft), cv::Point(125,230), 0, 0.5, green, 2);
+		cv::putText(mFrame, to_string((long long)cr.carRight), cv::Point(185,206), 0, 0.5, green, 2);
+		cv::putText(mFrame, to_string((long long)cr.truckRight), cv::Point(185,230), 0, 0.5, green, 2);
 
 		cv::imshow(mFrameWndName, mFrame);
 }

@@ -21,6 +21,15 @@ void CountRecorder::updateCnt(bool movesLeft, bool isTruck) {
 	}
 }
 
+CountResults CountRecorder::getStatus() {
+	CountResults cr;
+	cr.carLeft = mCarCntLeft;
+	cr.carRight = mCarCntRight;
+	cr.truckLeft = mTruckCntLeft;
+	cr.truckRight = mTruckCntRight;
+	return cr;
+}
+
 void CountRecorder::printResults() {
 	cout << endl;
 	cout << "---------- counting results ----------" << endl;

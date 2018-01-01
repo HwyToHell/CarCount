@@ -43,6 +43,8 @@ int main(int argc, char* argv[]) {
 		
 		if (!frameHandler.segmentFrame())
 			break;
+
+		int type = frameHandler.getFrameInfo();
 		
 		bboxList = frameHandler.calcBBoxes();
 
@@ -54,7 +56,9 @@ int main(int argc, char* argv[]) {
 
 		scene.countCars2(frameHandler.getCounter());
 		
-		frameHandler.showFrame(trackList, vehicleList);
+		CountResults cr = recorder.getStatus();
+
+		frameHandler.showFrame(trackList, cr);
 
 		//frameHandler.writeFrame();
 

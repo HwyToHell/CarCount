@@ -2,6 +2,7 @@
 #include "config.h"
 #include "observer.h"
 #include "tracker.h"
+#include "recorder.h"
 
 
 typedef cv::Rect_ <double> Rect2d; // delete, if opencv > v3.0 
@@ -12,6 +13,9 @@ const cv::Scalar orange = cv::Scalar(0,128,255);
 const cv::Scalar yellow = cv::Scalar(0,255,255);
 const cv::Scalar white = cv::Scalar(255,255,255);
 
+struct Line{
+	enum thickness { thin=1, thick=2};
+};
 
 class FrameHandler : public Observer {
 private:
@@ -33,17 +37,18 @@ private:
 	cv::Mat mFrame;
 	string mFrameWndName;
 	cv::Mat mFgrMask; // foreground mask of moving objects
+	cv::Mat mInset;
 	cv::BackgroundSubtractorMOG2 mMog2;
 	list<TrackEntry> mBBoxes; // bounding boxes of newly detected objects
 	cv::VideoWriter mVideoOut;
 public:
 	FrameHandler(Config* pConfig);
 	std::list<TrackEntry>& calcBBoxes();
-	void drawVehicles(list<Vehicle>& vehicles);
+	int getFrameInfo();
 	bool openCapSource(bool fromFile = true);
 	bool openVideoOut(string fileName);
 	bool segmentFrame();
-	void showFrame(list<Track>& tracks, list<Vehicle>& vehicles);
+	void showFrame(list<Track>& tracks, CountResults cr);
 	void update(); // updates observer with subject's parameters (Config)
 	void writeFrame();
 	// DEBUG
