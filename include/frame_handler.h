@@ -1,7 +1,5 @@
 #pragma once
 #include "config.h"
-#include "observer.h"
-#include "tracker.h"
 #include "recorder.h"
 
 
@@ -35,20 +33,20 @@ private:
 	Rect2d mRoi;	 // region of interest, within framesize
 	Rect2d mRoiNorm; // normalized roi, related to framesize
 	cv::Mat mFrame;
-	string mFrameWndName;
+	std::string mFrameWndName;
 	cv::Mat mFgrMask; // foreground mask of moving objects
 	cv::Mat mInset;
 	cv::BackgroundSubtractorMOG2 mMog2;
-	list<TrackEntry> mBBoxes; // bounding boxes of newly detected objects
+	std::list<TrackEntry> mBBoxes; // bounding boxes of newly detected objects
 	cv::VideoWriter mVideoOut;
 public:
 	FrameHandler(Config* pConfig);
 	std::list<TrackEntry>& calcBBoxes();
 	int getFrameInfo();
 	bool openCapSource(bool fromFile = true);
-	bool openVideoOut(string fileName);
+	bool openVideoOut(std::string fileName);
 	bool segmentFrame();
-	void showFrame(list<Track>& tracks, CountResults cr);
+	void showFrame(std::list<Track>& tracks, CountResults cr);
 	void update(); // updates observer with subject's parameters (Config)
 	void writeFrame();
 	// DEBUG

@@ -1,6 +1,8 @@
 #include "stdafx.h"
 #include "../include/frame_handler.h"
 
+using namespace std;
+
 FrameHandler::FrameHandler(Config* pConfig) : Observer(pConfig), mMog2(100, 25, false) {
 	string inset_path = pConfig->getParam("video_path");
 	inset_path += "inset3.png";

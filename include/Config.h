@@ -1,6 +1,6 @@
 #pragma once
 #include "tracker.h"
-#include "observer.h"
+#include "../../../cpp/inc/observer.h"
 
 class Parameter {
 private:
@@ -38,7 +38,7 @@ public:
 	Config(std::string dbFileName = "");
 	~Config();
 	double getDouble(std::string name);
-	string getParam(string name);
+	std::string getParam(std::string name);
 	bool init();	
 	bool insertParam(Parameter param);
 	bool populateStdParams();

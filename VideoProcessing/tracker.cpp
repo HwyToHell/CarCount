@@ -1,7 +1,8 @@
 #include "stdafx.h"
 #include "../include/config.h"
-#include "../include/tracker.h"
 #include "../include/recorder.h"
+
+using namespace std;
 
 double euclideanDist(cv::Point& pt1, cv::Point& pt2)
 {
@@ -272,7 +273,7 @@ void SceneTracker::update() {
 /// assign blobs to existing tracks
 /// create new tracks from unassigned blobs
 /// erase, if marked for deletion
-list<Track>& SceneTracker::updateTracks(list<TrackEntry>& blobs) {
+std::list<Track>& SceneTracker::updateTracks(list<TrackEntry>& blobs) {
 	/* debug_begin
 	{
 		int no = 1;

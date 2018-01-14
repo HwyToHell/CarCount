@@ -1,6 +1,7 @@
 #include "stdafx.h"
 #include "../include/recorder.h"
 
+using namespace std;
 
 void CountRecorder::updateCnt(bool movesLeft, bool isTruck) {
 	if (isTruck) {

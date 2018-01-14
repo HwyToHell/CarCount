@@ -1,6 +1,5 @@
 #pragma once
 
-using namespace std;
 
 struct CountResults {
 	int carLeft;

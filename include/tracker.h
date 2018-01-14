@@ -1,5 +1,5 @@
 #pragma once
-#include "../include/observer.h"
+#include "../../../cpp/inc/observer.h"
 
 // helper functions
 double euclideanDist(cv::Point& pt1, cv::Point& pt2);
@@ -103,18 +103,18 @@ public:
 	void attachCountRecorder(CountRecorder* pRecorder);
 	void SceneTracker::countCars();
 	void SceneTracker::countCars2(int frmCnt);
-	list<Vehicle>& combineTracks();
+	std::list<Vehicle>& combineTracks();
 	int nextTrackID();
 	void printVehicles();
 	bool returnTrackID(int id);
 	void showTracks(cv::Mat& frame);
 	void showVehicles(cv::Mat& frame);
 	void update(); // updates observer with subject's parameters (Config)
-	list<Track>& updateTracks(std::list<TrackEntry>& blobs);
+	std::list<Track>& updateTracks(std::list<TrackEntry>& blobs);
 	void updateTracksFromContours(const std::vector<std::vector<cv::Point>>& contours, 
 		std::vector<std::vector<cv::Point>>& movingContours);
 	//std::vector<int> getAllContourIndices();
-	list<Vehicle>& getVehicles();  // TODO update all vehicles
+	std::list<Vehicle>& getVehicles();  // TODO update all vehicles
 
 	bool HaveSimilarVelocityVector(Track& track1, Track& track2); // TODO delete, after testing Track::hasSimilarVelocityVector
 	bool AreClose(Track& track1, Track& track2); // TODO delete, after testing Track::isClose()
