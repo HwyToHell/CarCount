@@ -15,9 +15,11 @@ double round(double number) // not necessary in C++11
     return number < 0.0 ? ceil(number - 0.5) : floor(number + 0.5);
 }
 
-// detected blobs
-TrackEntry::TrackEntry(int x, int y, int width, int height, int idx) : mIdxContour(idx), mVelocity(0,0)
-{
+/******************************************************************************
+/*** TrackEntry ***************************************************************
+/******************************************************************************/
+
+TrackEntry::TrackEntry(int x, int y, int width, int height) {
 	mBbox.x = abs(x);
 	mBbox.y = abs(y);
 	mBbox.width = abs(width);
@@ -26,15 +28,17 @@ TrackEntry::TrackEntry(int x, int y, int width, int height, int idx) : mIdxConto
 	mCentroid.y = mBbox.y + (mBbox.height / 2);
 }
 
-TrackEntry::TrackEntry(cv::Rect _bbox, int _idxContour) : mBbox(_bbox), mIdxContour(_idxContour), mVelocity(0,0)
-{
+TrackEntry::TrackEntry(cv::Rect _bbox) : mBbox(_bbox) {
 	mCentroid.x = mBbox.x + (mBbox.width / 2);
 	mCentroid.y = mBbox.y + (mBbox.height / 2);
 }
 
+cv::Point2i TrackEntry::centroid() {
+	return mCentroid;
+}
+
 // mMaxDeviation% in width and height allowed
-bool TrackEntry::hasSimilarSize(TrackEntry& teCompare, double maxDeviation)
-{
+bool TrackEntry::hasSimilarSize(TrackEntry& teCompare, double maxDeviation) {
 	if ( abs(mBbox.width - teCompare.mBbox.width) > (mBbox.width * maxDeviation / 100 ) )
 		return false;
 	if ( abs(mBbox.height - teCompare.mBbox.height) > (mBbox.height * maxDeviation / 100 ) )
@@ -42,10 +46,21 @@ bool TrackEntry::hasSimilarSize(TrackEntry& teCompare, double maxDeviation)
 	return true;
 }
 
+int TrackEntry::height() {
+	return mBbox.height;
+}
 
-// track vector
+int TrackEntry::width() {
+	return mBbox.width;
+}
+
+
+/******************************************************************************
+/*** Track ********************************************************************
+/******************************************************************************/
+
 Track::Track(TrackEntry& blob, int id) : mMaxDist(30), mMaxDeviation(80), mMaxConfidence(6), 
-	mTrafficFlow(1,0), mId(id), mConfidence(0), mIdxCombine(0), mCounted(false), mMarkedForDelete(false), 
+	mTrafficFlow(1,0), mId(id), mConfidence(0), mCounted(false), mMarkedForDelete(false), 
 	mAvgVelocity(0,0) {
 	// const criteria for blob assignment
 	// mMaxDist = 30 --> maximum of 30 pixel distance between centroids
@@ -61,25 +76,26 @@ Track& Track::operator= (const Track& source) {
 
 void Track::addTrackEntry(const TrackEntry& blob) {
 	mHistory.push_back(blob);
-	int lengthHistory = mHistory.size();
-	if (lengthHistory > 1) { // update velocity from n-1 positions
-		mHistory[lengthHistory-1].mVelocity = mHistory[lengthHistory-1].mCentroid - mHistory[lengthHistory-2].mCentroid;
-	}
-	updateAvgVelocity();
+
+	updateAverageVelocity();
+
 	return;
 }
 
 void Track::addSubstitute() {
 	// take average velocity and compose bbox from centroid of previous element
 	cv::Point2i velocity((int)round(mAvgVelocity.x), (int)round(mAvgVelocity.y));
-	TrackEntry substitute = mHistory.back();
-	substitute.mCentroid += velocity;
-	substitute.mBbox.x = substitute.mCentroid.x - substitute.mBbox.width / 2;
-	substitute.mBbox.x < 0 ? 0 : substitute.mBbox.x;
-	substitute.mBbox.y = substitute.mCentroid.y - substitute.mBbox.height / 2;
-	substitute.mBbox.y < 0 ? 0 : substitute.mBbox.y;
-	// ToDo: check upper bounds of video window
-	addTrackEntry(substitute);
+
+	cv::Point2i centroid = mHistory.back().centroid();
+	centroid += velocity;
+	int height = mHistory.back().height();
+	int width = mHistory.back().width();
+	int x = centroid.x - width / 2;
+	int y = centroid.y - height / 2;
+	// TODO: use Track::avgHeight, avgWidth
+	// TODO: check lower and upper bounds of video window
+
+	addTrackEntry(TrackEntry(x, y, width, height));
 	return;
 }
 
@@ -92,10 +108,8 @@ int Track::getConfidence() { return mConfidence; }
 
 int Track::getId() { return mId; }
 
-int Track::getIdxCombine() { return mIdxCombine; }
-
 double Track::getLength() {
-	double length = euclideanDist(mHistory.front().mCentroid, mHistory.back().mCentroid);
+	double length = euclideanDist(mHistory.front().centroid(), mHistory.back().centroid());
 	return length;
 }
 
@@ -149,6 +163,8 @@ bool Track::hasSimilarVelocityVector(Track& track2, double directionDiff, double
 
 bool Track::isAssigned() {return mAssigned;}
 
+
+//TODO isClose --> TrackEntry
 bool Track::isClose(Track& track2, int maxDist) {
 	int dist_x = maxDist; // default: 30
 	int dist_y = maxDist; // default: 30
@@ -177,52 +193,53 @@ void Track::setCounted(bool state) { mCounted = state; }
 
 void Track::setId(int trkID) { mId = trkID;}
 
-void Track::setIdxCombine(int idx) {mIdxCombine = idx;}
+
 
 /// average velocity with recursive formula
-void Track::updateAvgVelocity()
-{
+cv::Point2d& Track::updateAverageVelocity() {
 	const int window = 5;
 	int lengthHistory = mHistory.size();
-	cv::Point2d avg = cv::Point2d(0,0);
-	int n = lengthHistory - 1; 	
-	if (n > 0) // more than 1 TrackEntries needed in order to calculate velocity
-	{
-		if (n < window+1) // window not fully populated yet
-		{
-			mAvgVelocity.x = (mAvgVelocity.x * (n - 1) + mHistory[n].mVelocity.x) / n;
-			mAvgVelocity.y = (mAvgVelocity.y * (n - 1) + mHistory[n].mVelocity.y) / n;
+
+	if (lengthHistory > 1) {
+		int idxMax = lengthHistory - 1;
+		cv::Point2d actVelocity = mHistory[idxMax].centroid() - mHistory[idxMax-1].centroid();
+
+		if (idxMax <= window) { // window not fully populated yet
+			mAvgVelocity = (mAvgVelocity * (double)(idxMax - 1) + actVelocity) * (1.0 / (double)(idxMax));
 		}
-		else // moving average over <window> values
-		{
-			mAvgVelocity.x += ((mHistory[n].mVelocity.x - mHistory[n-(int)window].mVelocity.x) / (double)window);
-			mAvgVelocity.y += ((mHistory[n].mVelocity.y - mHistory[n-(int)window].mVelocity.y) / (double)window);
+		else { // window fully populated, remove window-1 velocity value
+			cv::Point2d oldVelocity = mHistory[idxMax-window].centroid() - mHistory[idxMax-window-1].centroid();
+			mAvgVelocity += (actVelocity - oldVelocity) * (1.0 / (double)window);
 		}
 	}
-	return;
+
+	return mAvgVelocity;
 }
 
-
-/// iterate through detected blobs, check if size is similar, distance close, save closest blob to history and delete from blob input list 
+/// iterate through detected blobs, check if size is similar and distance close
+/// save closest blob to history and delete from blob input list 
 void Track::updateTrack(std::list<TrackEntry>& blobs) {
+	typedef std::list<TrackEntry>::iterator TiterBlobs;
 	double minDist = mMaxDist; // minDist needed to determine closest track
-	std::list<TrackEntry>::iterator ns = blobs.begin(), nsMinDist = blobs.end();
-	while (ns != blobs.end()) {
-		if ( getActualEntry().hasSimilarSize(*ns, mMaxDeviation) ) {
-			ns->mDistance = euclideanDist(ns->mCentroid, getActualEntry().mCentroid);
-			if (ns->mDistance < minDist) {
-				minDist = ns->mDistance;
-				nsMinDist = ns;
+	TiterBlobs iBlobs = blobs.begin();
+	TiterBlobs iBlobsMinDist = blobs.end(); // points to blob with closest distance to track
+	
+	while (iBlobs != blobs.end()) {
+		if ( getActualEntry().hasSimilarSize(*iBlobs, mMaxDeviation) ) {
+			double distance = euclideanDist(iBlobs->centroid(), getActualEntry().centroid());
+			if (distance < minDist) {
+				minDist = distance;
+				iBlobsMinDist = iBlobs;
 			}
 		}
-		++ns;
+		++iBlobs;
 	}// end iterate through all input blobs
 
 	// assign closest shape to track and delete from list of blobs
-	if (nsMinDist != blobs.end()) // shape to assign available
+	if (iBlobsMinDist != blobs.end()) // shape to assign available
 	{
-		addTrackEntry(*nsMinDist);
-		ns = blobs.erase(nsMinDist);
+		addTrackEntry(*iBlobsMinDist);
+		iBlobs = blobs.erase(iBlobsMinDist);
 		mConfidence <  mMaxConfidence ? ++mConfidence : mConfidence =  mMaxConfidence;
 	}
 	else // no shape to assign availabe, calculate substitute
@@ -235,13 +252,14 @@ void Track::updateTrack(std::list<TrackEntry>& blobs) {
 		else
 			addSubstitute();
 	}
-	mAssigned = false; // set to true in Vehicle::Update
+	mAssigned = false; // set to true in SceneTracker::updateTracks
 }
 
 
 
 /******************************************************************************
-/**************************** SceneTracker ***********************************/
+/*** SceneTracker *************************************************************
+/******************************************************************************/
 
 SceneTracker::SceneTracker(Config* pConfig) : Observer(pConfig) {
 	update();
@@ -251,7 +269,7 @@ void SceneTracker::attachCountRecorder(CountRecorder* pRecorder) {
 	mRecorder = pRecorder;
 }
 
-
+/// update parameters from config subject
 void SceneTracker::update() {
 	mConfCreate = (int)mSubject->getDouble("group_min_confidence");
 	mDistSubTrack = (int)mSubject->getDouble("group_distance");
@@ -271,164 +289,46 @@ void SceneTracker::update() {
 }
 
 /// assign blobs to existing tracks
-/// create new tracks from unassigned blobs
-/// erase, if marked for deletion
+///  create new tracks from unassigned blobs
+///  erase, if marked for deletion
 std::list<Track>& SceneTracker::updateTracks(list<TrackEntry>& blobs) {
-	/* debug_begin
-	{
-		int no = 1;
-		std::list<Track>::iterator tr = mTracks.begin();
-		std::cout << "Tracks BEFORE update" << std::endl;
-		while (tr != mTracks.end())
-		{
-			std::cout << "track no " << no << ": " << tr->GetActualEntry().mBbox << std::endl;
-			++tr;
-			++no;
-		}
 
-		no = 1;
-		std::cout << "Blobs BEFORE update" << std::endl;
-		std::list<TrackEntry>::iterator bl = blobs.begin();
-		while (bl != blobs.end())
-		{
-			std::cout << "blob no " << no << ": " << bl->mBbox << std::endl;
-			++bl;
-			++no;
-		}
-		std::cout << std::endl;
-	}
-	// debug_end */
-
-	std::list<Track>::iterator tr = mTracks.begin();
-	while (tr != mTracks.end())
+	// assign blobs to existing tracks
+	// delete orphaned tracks and free associated Track-ID
+	//  for_each track
+	std::list<Track>::iterator iTrack = mTracks.begin();
+	while (iTrack != mTracks.end())
 	{
-		tr->setAssigned(false);
-		tr->updateTrack(blobs);
-		// ToDo: remove pointers to MarkedForDeletion tracks in vehicles, before deleting tracks in scene 
-		if (tr->isMarkedForDelete())
+		iTrack->setAssigned(false);
+		iTrack->updateTrack(blobs); // assign new blobs to existing track
+
+		if (iTrack->isMarkedForDelete())
 		{
-			returnTrackID(tr->getId());
-			tr = mTracks.erase(tr);
+			returnTrackID(iTrack->getId());
+			iTrack = mTracks.erase(iTrack);
 		}
 		else
-			++tr;
+			++iTrack;
 	}
 	
 	// create new tracks for unassigned blobs
 	mTrackIDs.sort(std::greater<int>());
-	std::list<TrackEntry>::iterator bl = blobs.begin();
-	while (bl != blobs.end())
+	std::list<TrackEntry>::iterator iBlob = blobs.begin();
+	while (iBlob != blobs.end())
 	{
 		int trackID = nextTrackID();
 		if (trackID > 0)
-			mTracks.push_back(Track(*bl, trackID));
-		++bl;
+			mTracks.push_back(Track(*iBlob, trackID));
+		++iBlob;
 	}
 	blobs.clear();
 	
-	/* debug_begin
-	{
-		int no = 1;
-		std::list<Track>::iterator tr = mTracks.begin();
-		std::cout << "Tracks AFTER update" << std::endl;
-		while (tr != mTracks.end())
-		{
-			std::cout << "track no " << no << ": " << tr->GetActualEntry().mBbox << std::endl;
-			++tr;
-			++no;
-		}
-		no = 1;
-		std::cout << "Blobs AFTER update" << std::endl;
-		std::list<TrackEntry>::iterator bl = blobs.begin();
-		while (bl != blobs.end())
-		{
-			std::cout << "blob no " << no << ": " << bl->mBbox << std::endl;
-			++bl;
-			++no;
-		}
-		std::cout << std::endl;
-	}
-	// debug_end */
 	return mTracks;
 }
 
-bool IsIdxZero(Track& track)
-{
-	if (track.getIdxCombine() == 0)
-		return true;
-	else
-		return false;
-}
-
-bool cmp_idx(Track& smaller, Track& larger)
-{
-	return (smaller.getIdxCombine() < larger.getIdxCombine());
-}
-
-bool sort_idx(Track& first, Track& second)
-{
-	return (first.getIdxCombine() < second.getIdxCombine());
-}
-
-
-void prnVehicle(Vehicle& vehicle)
-{
-	std::cout << "Vehicle - Rect: " << vehicle.getBbox() << "; Velocity: " << vehicle.getVelocity() << std::endl;
-}
 
 
 
-bool SceneTracker::HaveSimilarVelocityVector(Track& track1, Track& track2)
-{
-	cv::Point2d vel1 = track1.getVelocity();
-	cv::Point2d vel2 = track2.getVelocity();
-
-	double vel1_DotTraffic = mTrafficFlow.ddot(vel1);
-	double cosPhiVel1 = vel1_DotTraffic / cv::norm(vel1) / cv::norm(mTrafficFlow);
-
-	double vel2_DotTraffic = mTrafficFlow.ddot(vel2);
-	double cosPhiVel2 = vel2_DotTraffic / cv::norm(vel2) / cv::norm(mTrafficFlow);
-
-	if (signBit(vel1_DotTraffic) != signBit(vel2_DotTraffic))
-		return false; // opposite direction
-
-	if ((std::abs(cosPhiVel1) < 0.9) || (std::abs(cosPhiVel2) < 0.9))
-		return false; // direction deviation too large
-	
-	if (abs(vel2_DotTraffic) > abs(vel1_DotTraffic * 0.5) && abs(vel2_DotTraffic) < abs(vel1_DotTraffic * 2) )
-		return true; // vel1 * 0.5 < vel2 < vel1 * 2 ---> max velocity difference 50%
-	else
-		return false;
-/*
-	double sumVelDotTraffic = abs(vel1_DotTraffic) + abs(vel2_DotTraffic);
-	double diffVelDotTraffic = abs( abs(vel1_DotTraffic) - abs(vel2_DotTraffic) );
-	
-	if ((diffVelDotTraffic/sumVelDotTraffic) < 0.3334)
-		return true;
-	else return false;
-	*/
-}
-
-/* TODO Delete after testing of Track::isClose() */
-// Check proximity of bbox of two tracks to compare	
-bool SceneTracker::AreClose(Track& track1, Track& track2)
-{
-	int dist_x = mDistSubTrack; // default: 30
-	int dist_y = mDistSubTrack; // default: 30
-	bool x_close, y_close;
-	
-	if (track1.getActualEntry().mBbox.x < track2.getActualEntry().mBbox.x)
-		x_close = track2.getActualEntry().mBbox.x - (track1.getActualEntry().mBbox.x + track1.getActualEntry().mBbox.width) < dist_x ? true : false;
-	else
-		x_close = track1.getActualEntry().mBbox.x - (track2.getActualEntry().mBbox.x + track2.getActualEntry().mBbox.width) < dist_x ? true : false;
-
-	if (track1.getActualEntry().mBbox.y < track2.getActualEntry().mBbox.y)
-		y_close = track2.getActualEntry().mBbox.y - (track1.getActualEntry().mBbox.y + track1.getActualEntry().mBbox.height) < dist_y ? true : false;
-	else
-		y_close = track1.getActualEntry().mBbox.y - (track2.getActualEntry().mBbox.y + track2.getActualEntry().mBbox.height) < dist_y ? true : false;
-
-	return (x_close & y_close);
-}
 
 
 struct Trk {
@@ -440,11 +340,11 @@ struct Trk {
 };
 
 
-void SceneTracker::inspect(int frmCnt) {
+void SceneTracker::inspect(int frameCnt) {
 	vector<Trk> tracks;
 	list<Track>::iterator iTrack = mTracks.begin();
 	while (iTrack != mTracks.end()) {
-		tracks.push_back(Trk(iTrack->getId(), iTrack->getConfidence(), iTrack->getActualEntry().mVelocity.x, iTrack->isCounted()));
+		tracks.push_back(Trk(iTrack->getId(), iTrack->getConfidence(), iTrack->getVelocity().x, iTrack->isCounted()));
 		++iTrack;
 	}
 }
@@ -452,18 +352,23 @@ void SceneTracker::inspect(int frmCnt) {
 enum direction { left=0, right};
 
 
-void printCount(int frmCnt, double length, direction dir) {
+void printCount(int frameCnt, double length, direction dir) {
 	char* sDir[] = { " <<<left<<<  ", " >>>right>>> "};
 	cout.precision(1);
-	cout << "frame: " << setw(4) << fixed << frmCnt << sDir[dir];
+	cout << "frame: " << setw(4) << fixed << frameCnt << sDir[dir];
 	cout << "length: " << setw(4) <<  length << endl;
 };
 
-void printCount2(int frmCnt, int width, int height) {
-	cout << "frame: " << setw(4) << frmCnt;
+void printCount2(int frameCnt, int width, int height) {
+	cout << "frame: " << setw(4) << frameCnt;
 	cout << " width: " << setw(4) << width;
 	cout << " height: " << setw(4) <<  height << endl << endl;
 };
+
+
+/******************************************************************************
+/*** CountAndClassify *********************************************************
+/******************************************************************************/
 
 
 class CountAndClassify {
@@ -471,14 +376,14 @@ class CountAndClassify {
 	CountRecorder* mRecorder;
 
 public:
-	CountAndClassify(int frmCnt, CountRecorder* pRec) : mFrameCnt(frmCnt), mRecorder(pRec) {}
+	CountAndClassify(int frameCnt, CountRecorder* pRec) : mFrameCnt(frameCnt), mRecorder(pRec) {}
 	void operator()(Track& track) {
 		int countPos = 90; // roi.width/2 = "count_pos_x"
 		double trackLength = track.getLength();
 		if (track.getConfidence() > 3) {
 			cv::Point2d velocity(track.getVelocity());
 			if (signBit(velocity.x)) { // moving to left
-				if ((track.getActualEntry().mCentroid.x < countPos) && !track.isCounted()) {
+				if ((track.getActualEntry().centroid().x < countPos) && !track.isCounted()) {
 					if (trackLength > 20) { // "count_track_length"
 						track.setCounted(true);
 						bool movesLeft = true;
@@ -494,7 +399,7 @@ public:
 				}
 			}
 			else {// moving to right
-				if ((track.getActualEntry().mCentroid.x > countPos) && !track.isCounted()) {
+				if ((track.getActualEntry().centroid().x > countPos) && !track.isCounted()) {
 					if (trackLength > 20) {
 						track.setCounted(true);
 						bool movesLeft = false;
@@ -526,12 +431,12 @@ void checkPosAndDir(Track& track) {
 	if (track.getConfidence() > 4) {
 		cv::Point2d velocity(track.getVelocity());
 		if (signBit(velocity.x)) { // moving to left
-			if (track.getActualEntry().mCentroid.x < countPos) {
+			if (track.getActualEntry().centroid().x < countPos) {
 				track.setCounted(true);
 			}
 		}
 		else {// moving to right
-			if (track.getActualEntry().mCentroid.x > countPos)
+			if (track.getActualEntry().centroid().x > countPos)
 				track.setCounted(true);
 		}
 	}
@@ -545,116 +450,13 @@ void SceneTracker::countCars() {
 	for_each(mTracks.begin(), mTracks.end(), checkPosAndDir);
 }
 
-void SceneTracker::countCars2(int frmCnt) {
+void SceneTracker::countCars2(int frameCnt) {
 	// track confidence > x
 	// moving left && position < yy
 	// moving right && position > yy
-	for_each(mTracks.begin(), mTracks.end(), CountAndClassify(frmCnt, mRecorder));
+	for_each(mTracks.begin(), mTracks.end(), CountAndClassify(frameCnt, mRecorder));
 }
 
-list<Vehicle>& SceneTracker::combineTracks()
-{
-	mVehicles.clear();
-	
-	std::list<Track*> pTracks; // list with pointers to tracks with high confidence
-	std::vector<std::list<Track*>> vCombTracks; // vector with list of pointers to tracks
-	std::list<Track>::iterator tr = mTracks.begin();
-	//std::for_each(mTracks.begin(), mTracks.end(), prnTrackId);
-
-	// copy pointers to tracks 
-	//  that move and
-	//  have high confidence into new list
-	while (tr != mTracks.end())
-	{
-		int conf = tr->getConfidence();
-		bool isMoving = (norm(tr->getVelocity()) > mMinVelocityL2Norm);
-		// ToDo: creating a fgMask from contours fails, if substitute values for blobs were calculated (conf < maxConf)
-		// in this case track entry must not assigned to idxContour 
-		if ((conf > mConfCreate) && isMoving)
-			pTracks.push_back(tr->getThis());
-		++tr;
-	}
-
-	// create vector of lists with pointers to tracks that need to be combined
-	int idx = 0;
-	std::list<Track*>::iterator pTr = pTracks.begin();
-	while (pTr != pTracks.end())
-	{
-		std::list<Track*> tempList;
-		// create new row with empty list
-		vCombTracks.push_back(tempList);
-		// move actual track entry to end of list
-		vCombTracks[idx].push_back(*pTr);
-		pTr = pTracks.erase(pTr);
-		while (pTr != pTracks.end())
-		{
-			bool hasSimilarVelocity = HaveSimilarVelocityVector(*vCombTracks[idx].back(), **pTr);
-			bool isClose = AreClose(*vCombTracks[idx].back(), (**pTr));
-			/// TODO test alternative
-			double direction = 0.1;
-			double norm = 0.5;
-			hasSimilarVelocity = (**pTr).hasSimilarVelocityVector(*vCombTracks[idx].back(), direction, norm);
-			isClose = (**pTr).isClose(*vCombTracks[idx].back(), mDistSubTrack);
-			/// end test alternative
-
-
-			if (hasSimilarVelocity && isClose)
-			{
-				vCombTracks[idx].push_back(*pTr);
-				pTr = pTracks.erase(pTr);
-			}
-			else
-				++pTr;
-		}
-		++idx;
-		pTr = pTracks.begin();
-	}
-
-	// combine bounding boxes, average velocity and create vehicle
-	//  for each vectorelement
-	//  combine list entries
-	//  build vector of contour indices
-	//  and create vehicle
-	for (unsigned int i = 0; i < vCombTracks.size(); ++i)
-	{
-		pTr = vCombTracks[i].begin();
-		cv::Point2d sumVelocity = (*pTr)->getVelocity();
-		cv::Rect sumBbox = (*pTr)->getActualEntry().mBbox;
-		std::vector<int> contourIndices;
-		contourIndices.push_back((*pTr)->getActualEntry().mIdxContour);
-		int nSum = 1;
-		++pTr;
-		while (pTr != vCombTracks[i].end())
-		{
-			sumBbox |= (*pTr)->getActualEntry().mBbox;
-			sumVelocity += (*pTr)->getVelocity();
-			contourIndices.push_back((*pTr)->getActualEntry().mIdxContour);
-			++nSum;
-			++pTr;
-		} 
-		// create vehicle
-		cv::Point2d avgVelocity = sumVelocity * (1.0 / nSum);
-		mVehicles.push_back(Vehicle(sumBbox, avgVelocity, contourIndices));
-	}
-	return mVehicles;
-}
-
-/* TODO delete, if not needed std::vector<int> SceneTracker::getAllContourIndices()
-{
-	std::vector<int> allContourIndices;
-	std::list<Vehicle>::iterator ve = mVehicles.begin();
-	while (ve != mVehicles.end())
-	{
-		allContourIndices.insert(allContourIndices.end(), ve->contourIndices.begin(), ve->contourIndices.end());
-		++ve;
-	}
-	return allContourIndices;
-}
-*/
-
-list<Vehicle>& SceneTracker::getVehicles() {
-	return mVehicles;
-}
 
 
 int SceneTracker::nextTrackID()
@@ -684,90 +486,3 @@ bool SceneTracker::returnTrackID(int id)
 	else
 		return false;
 }
-
-
-
-void SceneTracker::showTracks(cv::Mat& frame)
-{
-	int line_slim = 1;
-	int line_fat = 2;
-
-	const cv::Scalar red = cv::Scalar(0,0,255);
-	const cv::Scalar orange = cv::Scalar(0,128,255);
-	const cv::Scalar yellow = cv::Scalar(0,255,255);
-	const cv::Scalar ye_gr = cv::Scalar(0,255,180);
-	const cv::Scalar green = cv::Scalar(0,255,0);
-
-	std::list<Track>::iterator it = mTracks.begin();
-	while (it != mTracks.end())
-	{
-		cv::rectangle(frame, it->getActualEntry().mBbox, green, line_slim);
-		cv::Point textPos(it->getActualEntry().mBbox.x, it->getActualEntry().mBbox.y);
-		// show avg velocity
-		cv::Point textPos_x(it->getActualEntry().mCentroid.x+10, it->getActualEntry().mCentroid.y);
-		cv::Point textPos_y(it->getActualEntry().mCentroid.x, it->getActualEntry().mCentroid.y+10);
-
-		char buf[10];
-		double x_vel = it->getVelocity().x;
-		std::sprintf(buf, "%2.1f", x_vel);
-		std::string x_vel_str(buf);
-		
-		double y_vel = it->getVelocity().y;
-		std::sprintf(buf, "%2.1f", y_vel);
-		std::string y_vel_str(buf);
-
-		cv::putText(frame, x_vel_str, textPos_x, 0, 0.5, green, line_slim);
-		cv::putText(frame, y_vel_str, textPos_y, 0, 0.5, green, line_slim);
-		++it;
-	}
-}
-
-
-void SceneTracker::showVehicles(cv::Mat& frame)
-{
-	int line_slim = 1;
-	int line_fat = 2;
-	const cv::Scalar red = cv::Scalar(0,0,255);
-	std::list<Vehicle>::iterator ve = mVehicles.begin();
-	while (ve != mVehicles.end())
-	{
-		cv::rectangle(frame, ve->getBbox(), red, line_fat);
-		++ve;
-	}
-
-}
-
-void SceneTracker::printVehicles()
-{
-	for_each(mVehicles.begin(), mVehicles.end(), prnVehicle);
-}
-
-
-// TODO delete vehicle representation
-Vehicle::Vehicle(cv::Rect _bbox, cv::Point2d _velocity, std::vector<int> _contourIndices) 
-	: mBbox(_bbox), mVelocity(_velocity), mContourIndices(_contourIndices), mConfAssign(3), mConfVisible(4)
-{
-	mCentroid.x = mBbox.x + (mBbox.width / 2);
-	mCentroid.y = mBbox.y + (mBbox.height / 2);
-}
-
-
-
-
-
-cv::Rect Vehicle::getBbox()
-{
-	return mBbox;
-}
-
-cv::Point2i Vehicle::getCentroid()
-{
-	return mCentroid;
-}
-
-cv::Point2d Vehicle::getVelocity()
-{
-	return mVelocity;
-}
-
-void Vehicle::update() {}

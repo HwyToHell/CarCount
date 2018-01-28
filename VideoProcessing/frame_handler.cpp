@@ -56,7 +56,7 @@ std::list<TrackEntry>& FrameHandler::calcBBoxes() {
 	for (unsigned int i = 0; i < contours.size(); i++) { 
 		cv::Rect bbox = boundingRect(contours[i]);
 		if ((bbox.area() > mBlobArea.min) && (bbox.area() < mBlobArea.max)) {
-				mBBoxes.push_back(TrackEntry(bbox, i));
+				mBBoxes.push_back(TrackEntry(bbox));
 		}
 	}
 	

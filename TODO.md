@@ -1,4 +1,10 @@
 /// TODO
+[2017-01-28]
+- Track::isClose --> TrackEntry
+- TrackEntry::mVelocity --> Track
+- Track --> avgHeight, avgWidth (similar to avgVelocity)
+
+
 [2017-12-30]
 Track
 - define struct for parameters (maxDist, maxConfidence, trafficFlow)
@@ -7,7 +13,7 @@ Track
 
 [2017-12-27]
 Config::init
-- move workDir logig to here
+- move workDir logic to here
 - store workPath in ParamList
 Config
 - read from / write to config only at startup and closedown

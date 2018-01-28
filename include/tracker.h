@@ -10,18 +10,18 @@ class Config;
 
 // representation for a blob (detected geometric moving object) in the track vector 
 class TrackEntry {
-public:
-	TrackEntry(int x = 0, int y = 0, int width = 100, int height = 50, int idx = 0);
-	TrackEntry(cv::Rect rect, int idx);
-	bool hasSimilarSize(TrackEntry& teCompare, double maxDeviation);
-
-//private:
+public://private:
 	cv::Rect mBbox;
 	cv::Point2i mCentroid;
-	int mIdxContour;
-	double mDistance;
-	bool mAssigned;
-	cv::Point2i mVelocity;
+
+public:
+	TrackEntry(int x = 0, int y = 0, int width = 100, int height = 50);
+	TrackEntry(cv::Rect rect);
+	
+	cv::Point2i centroid();
+	bool hasSimilarSize(TrackEntry& teCompare, double maxDeviation);
+	int height();
+	int width();
 };
 
 
@@ -37,10 +37,12 @@ private:
 	bool mCounted;
 	std::vector<TrackEntry> mHistory; // dimension: time
 	int mId;
-	int mIdxCombine;
+	//int mIdxCombine; //TODO delete
 	bool mMarkedForDelete;
 	cv::Point2d mTrafficFlow;
-	void updateAvgVelocity();
+
+	cv::Point2d& updateAverageVelocity();
+
 public:
 	Track(TrackEntry& blob, int id = 0);
 	Track& operator= (const Track& source);
@@ -50,7 +52,6 @@ public:
 	TrackEntry& getActualEntry();
 	int getConfidence();
 	int getId();
-	int getIdxCombine();
 	double getLength();
 	Track* getThis();
 	cv::Point2d getVelocity();
@@ -62,30 +63,9 @@ public:
 	void setAssigned(bool state);
 	void setCounted(bool state);
 	void setId(int trkID); // delete, if not needed
-	void setIdxCombine(int idx); // delete, if not needed
 	void updateTrack(std::list<TrackEntry>& blobs);
 };
 
-
-// TODO delete vehicle representation
-// vehicle representation
-class Vehicle {
-private:
-	const int mConfAssign;	// confidence above this level assigns unassigned trac to vehicle
-	const int mConfVisible;	// confidence above this level makes vehicle visible 
-	cv::Rect mBbox;
-	cv::Point2i mCentroid;
-	cv::Point2d mVelocity;
-	int mId;
-public:
-	Vehicle(cv::Rect _bbox, cv::Point2d _velocity, std::vector<int> _contourIndices);
-	cv::Rect getBbox();
-	cv::Point2i getCentroid();
-	cv::Point2d getVelocity();
-	void update();
-//private:
-	std::vector<int> mContourIndices;
-};
 
 class CountRecorder;
 
@@ -102,29 +82,24 @@ public:
 	SceneTracker(Config* pConfig);
 	void attachCountRecorder(CountRecorder* pRecorder);
 	void SceneTracker::countCars();
-	void SceneTracker::countCars2(int frmCnt);
-	std::list<Vehicle>& combineTracks();
+	void SceneTracker::countCars2(int frameCnt);
+	//std::list<Vehicle>& combineTracks(); // TODO delete
 	int nextTrackID();
 	void printVehicles();
 	bool returnTrackID(int id);
-	void showTracks(cv::Mat& frame);
-	void showVehicles(cv::Mat& frame);
 	void update(); // updates observer with subject's parameters (Config)
 	std::list<Track>& updateTracks(std::list<TrackEntry>& blobs);
 	void updateTracksFromContours(const std::vector<std::vector<cv::Point>>& contours, 
 		std::vector<std::vector<cv::Point>>& movingContours);
-	//std::vector<int> getAllContourIndices();
-	std::list<Vehicle>& getVehicles();  // TODO update all vehicles
 
-	bool HaveSimilarVelocityVector(Track& track1, Track& track2); // TODO delete, after testing Track::hasSimilarVelocityVector
-	bool AreClose(Track& track1, Track& track2); // TODO delete, after testing Track::isClose()
+	//bool HaveSimilarVelocityVector(Track& track1, Track& track2); // TODO delete, after testing Track::hasSimilarVelocityVector
+	//bool AreClose(Track& track1, Track& track2); // TODO delete, after testing Track::isClose()
 	//void DeleteVehicle();
 	// private:
 	std::list<Track> mTracks;
-	std::list<Vehicle> mVehicles;
 	std::list<int> mTrackIDs;
 	
 	// DEBUG
-	void inspect(int frmCnt);
+	void inspect(int frameCnt);
 
 };

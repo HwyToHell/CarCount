@@ -29,7 +29,7 @@ int main(int argc, char* argv[]) {
 
 	list<TrackEntry> bboxList; // debug only, delete after
 	list<Track> trackList;
-	list<Vehicle> vehicleList;
+
 
 	if (!frameHandler.openCapSource(true)) 
 		return -1;
