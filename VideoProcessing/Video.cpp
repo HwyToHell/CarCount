@@ -26,6 +26,8 @@ int main(int argc, char* argv[]) {
 	CountRecorder* pRecorder = &recorder;
 	scene.attachCountRecorder(pRecorder);
 
+	CountResults cr;
+
 
 	list<TrackEntry> bboxList; // debug only, delete after
 	list<Track> trackList;
@@ -52,11 +54,11 @@ int main(int argc, char* argv[]) {
 
 		//vehicleList = scene.combineTracks();
 
-		scene.inspect(frameHandler.getCounter());
+		scene.inspect(frameHandler.getFrameCount());
 
-		scene.countCars2(frameHandler.getCounter());
+		cr += scene.countVehicles(frameHandler.getFrameCount());
 		
-		CountResults cr = recorder.getStatus();
+		//CountResults cr = recorder.getStatus();
 
 		frameHandler.showFrame(trackList, cr);
 

@@ -1,7 +1,18 @@
 /// TODO
+[2018-02-03]
+- Test cases for vehicle moved to tracker_refactor
+- Track::checkPosAndDir
+- parameters (to be specified in Config)
+	int count_pos (depends on frame_size)
+	int count_track_length (depends on frame_size)
+	cv::Point2i classify_truck_size (depends on frame_size)
+
+	
+
+
 [2017-01-28]
-- Track::isClose --> TrackEntry
-- TrackEntry::mVelocity --> Track
+OK - Track::isClose --> TrackEntry
+OK - TrackEntry::mVelocity --> Track
 - Track --> avgHeight, avgWidth (similar to avgVelocity)
 
 

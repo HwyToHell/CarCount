@@ -3,6 +3,14 @@
 
 using namespace std;
 
+CountResults CountResults::operator+=(const CountResults& rhs) {
+	carLeft += rhs.carLeft;
+	carRight += rhs.carRight;
+	truckLeft += rhs.truckLeft;
+	truckRight += rhs.truckRight;
+	return *this;
+}
+
 void CountRecorder::updateCnt(bool movesLeft, bool isTruck) {
 	if (isTruck) {
 		if (movesLeft) {

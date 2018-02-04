@@ -50,5 +50,5 @@ public:
 	void update(); // updates observer with subject's parameters (Config)
 	void writeFrame();
 	// DEBUG
-	int getCounter();
+	int getFrameCount();
 };

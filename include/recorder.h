@@ -6,6 +6,16 @@ struct CountResults {
 	int carRight;
 	int truckLeft;
 	int truckRight;
+	CountResults() : carLeft(0), carRight(0), truckLeft(0), truckRight(0) {}
+	CountResults operator+=(const CountResults& rhs);
+};
+
+
+struct ClassifyVehicle {
+	int countConfidence;
+	int countPos;
+	int trackLength;
+	cv::Size2i truckSize;
 };
 
 

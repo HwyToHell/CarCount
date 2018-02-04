@@ -170,7 +170,7 @@ void FrameHandler::showFrame(list<Track>& tracks, CountResults cr) {
 		cv::Rect rec;
 		list<Track>::iterator iTrack = tracks.begin();
 		while (iTrack != tracks.end()){
-			rec = iTrack->getActualEntry().mBbox;
+			rec = iTrack->getActualEntry().rect();
 			rec.x += (int)mRoi.x;
 			rec.y += (int)mRoi.y;
 			boxColor = red;
@@ -199,6 +199,6 @@ void FrameHandler::writeFrame() {
 	mVideoOut.write(mFrame);
 }
 
-int FrameHandler::getCounter() {
+int FrameHandler::getFrameCount() {
 	return mFrameCounter;
 }
