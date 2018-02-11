@@ -66,17 +66,12 @@ bool Config::populateStdParams() {
 	mParamList.push_back(Parameter("blob_area_max", "int", "20000"));
 	// track assignment
 	mParamList.push_back(Parameter("track_max_confidence", "int", "4"));
-	mParamList.push_back(Parameter("track_max_distance", "double", "30"));
 	mParamList.push_back(Parameter("track_max_deviation", "double", "80"));
-	// grouping tracks to vehicles
+	mParamList.push_back(Parameter("track_max_distance", "double", "30"));
+	// scene tracker
 	mParamList.push_back(Parameter("max_n_of_tracks", "int", "9")); // maxNoIDs
-	mParamList.push_back(Parameter("group_min_confidence", "int", "3")); // confCreate
-	mParamList.push_back(Parameter("group_distance", "int", "30")); // distSubTrack
-	mParamList.push_back(Parameter("group_min_velocity", "double", "0.5")); // minVelocityL2Norm
-	// traffic flow
-	mParamList.push_back(Parameter("traffic_flow_x", "double", "1")); // traffic flow horizontal
-	mParamList.push_back(Parameter("traffic_flow_y", "double", "0")); // traffic flow horizontal
 	// counting
+	mParamList.push_back(Parameter("count_confidence", "int", "3"));
 	mParamList.push_back(Parameter("count_pos_x", "int", "90")); // counting position (within roi)
 	mParamList.push_back(Parameter("count_track_length", "int", "20")); // min track length for counting
 	// classification

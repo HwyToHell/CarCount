@@ -75,13 +75,8 @@ int TrackEntry::width() {
 /*** Track ********************************************************************
 /******************************************************************************/
 
-Track::Track(TrackEntry& blob, int id) : mMaxDist(30), mMaxDeviation(80), mMaxConfidence(6), 
-	mTrafficFlow(1,0), mId(id), mConfidence(0), mCounted(false), mMarkedForDelete(false), 
-	mAvgVelocity(0,0) {
-	// const criteria for blob assignment
-	// mMaxDist = 30 --> maximum of 30 pixel distance between centroids
-	// mMaxDeviation = 80 --> maximum 80% deviation in length and height
-	// maxConfidence = 6 --> maximum number of consecutive frames allowed for substitute value calculation
+Track::Track(TrackEntry& blob, int id) : mId(id), mAvgVelocity(0,0), mConfidence(0),
+	mCounted(false), mMarkedForDelete(false)  {
 	mHistory.push_back(blob);
 }
 
@@ -157,16 +152,18 @@ cv::Point2d& Track::updateAverageVelocity() {
 
 /// iterate through detected blobs, check if size is similar and distance close
 /// save closest blob to history and delete from blob input list 
-void Track::updateTrack(std::list<TrackEntry>& blobs) {
+void Track::updateTrack(std::list<TrackEntry>& blobs,  int maxConf, 
+	double maxDeviation, double maxDist) {
+	
 	typedef std::list<TrackEntry>::iterator TiterBlobs;
 	// minDist determines closest track
 	//	initialized with maxDist in order to consider only close tracks
-	double minDist = mMaxDist; 
+	double minDist = maxDist; 
 	TiterBlobs iBlobs = blobs.begin();
 	TiterBlobs iBlobsMinDist = blobs.end(); // points to blob with closest distance to track
 	
 	while (iBlobs != blobs.end()) {
-		if ( getActualEntry().isSizeSimilar(*iBlobs, mMaxDeviation) ) {
+		if ( getActualEntry().isSizeSimilar(*iBlobs, maxDeviation) ) {
 			double distance = euclideanDist(iBlobs->centroid(), getActualEntry().centroid());
 			if (distance < minDist) {
 				minDist = distance;
@@ -181,7 +178,7 @@ void Track::updateTrack(std::list<TrackEntry>& blobs) {
 	{
 		addTrackEntry(*iBlobsMinDist);
 		iBlobs = blobs.erase(iBlobsMinDist);
-		mConfidence <  mMaxConfidence ? ++mConfidence : mConfidence =  mMaxConfidence;
+		mConfidence <  maxConf ? ++mConfidence : mConfidence =  maxConf;
 	}
 	else // no shape to assign availabe, calculate substitute
 	{
@@ -203,6 +200,11 @@ void Track::updateTrack(std::list<TrackEntry>& blobs) {
 /******************************************************************************/
 
 SceneTracker::SceneTracker(Config* pConfig) : Observer(pConfig) {
+	// max number of tracks assignable (9)
+	mMaxNoIDs = stoi(mSubject->getParam("max_n_of_tracks"));
+	for (int i = mMaxNoIDs; i > 0; --i) // fill trackIDs with 9 ints
+		mTrackIDs.push_back(i);
+	// update all other relevant parameters from Config
 	update();
 }
 
@@ -231,7 +233,7 @@ public:
 				if ((track.getActualEntry().centroid().x < mClassify.countPos) && !track.isCounted()) {
 					if (trackLength > mClassify.trackLength) { // "count_track_length"
 						track.setCounted(true);
-						if ( (width > mClassify.truckSize.width) && (height > mClassify.truckSize.height) )
+						if ( (width >= mClassify.truckSize.width) && (height >= mClassify.truckSize.height) )
 							++mCr.truckLeft;
 						else // car
 							++mCr.carLeft;
@@ -242,21 +244,14 @@ public:
 				if ((track.getActualEntry().centroid().x > mClassify.countPos) && !track.isCounted()) {
 					if (trackLength > mClassify.trackLength) {
 						track.setCounted(true);
-						if ( (width > mClassify.truckSize.width) && (height > mClassify.truckSize.height) )
-							++mCr.truckLeft;
+						if ( (width >= mClassify.truckSize.width) && (height >= mClassify.truckSize.height) )
+							++mCr.truckRight;
 						else // car
-							++mCr.carLeft;
+							++mCr.carRight;
 					}
 				}
 			}
 		} // end_if track.getConfidence > countConfidence
-	
-		// DEBUG
-		++mDbgCnt;
-		cout << "pass: " << mDbgCnt << " cntResults: " 
-			<< "cl:" << mCr.carLeft << " tl:" << mCr.truckLeft << " cr:" << mCr.carRight << " tr:" << mCr.truckRight << endl;
-		// DEBUG END
-
 	} // end operator()
 
 	CountResults results() { 
@@ -276,13 +271,6 @@ CountResults SceneTracker::countVehicles(int frameCnt) {
 	// moving left && position < yy
 	// moving right && position > yy
 	
-	// TODO implement parameters in Config
-	mClassify.countConfidence = 3;
-	mClassify.countPos = 90; // roi.width/2 = "count_pos_x"
-	mClassify.trackLength = 20;
-	mClassify.truckSize = cv::Size2i(60, 28);
-	// END TODO
-
 	CntAndClassify cac = for_each(mTracks.begin(), mTracks.end(), CntAndClassify(frameCnt, mClassify));
 	CountResults cr = cac.results();
 	return cr;
@@ -316,21 +304,27 @@ bool SceneTracker::returnTrackID(int id)
 
 /// update observer's (SceneTracker) parameters from subject (Config)
 void SceneTracker::update() {
-	mConfCreate = (int)mSubject->getDouble("group_min_confidence");
-	mDistSubTrack = (int)mSubject->getDouble("group_distance");
-	mMaxNoIDs = (int)mSubject->getDouble("max_n_of_tracks");
-	mMinVelocityL2Norm = mSubject->getDouble("group_min_velocity");
-	mTrafficFlow.x = mSubject->getDouble("traffic_flow_x");
-	mTrafficFlow.y = mSubject->getDouble("traffic_flow_y");
+	// max confidence for tracks allowed
+	mMaxConfidence = stoi(mSubject->getParam("track_max_confidence"));
 
-	// mConfCreate(3)			-> confidence above this level creates vehicles from unassigned tracks
-	// mDistSubTrack(30)		-> max distance for grouping between bounding boxes of tracks
-	// mMaxNoIDs(9)				-> max number of tracks
-	// mMinVelocityL2Norm(0.5)	-> slower tracks won't be grouped
-	// mTrafficFlow.x(1)		-> horizontal component of traffic flow (normalized)
-	// mTrafficFlow.y(0)		-> vertical component of traffic flow (normalized)
-	for (int i = mMaxNoIDs; i > 0; --i) // fill trackIDs with 9 ints
-	mTrackIDs.push_back(i);
+	// assign to track: max deviation of track entries in percent
+	mMaxDeviation = stod(mSubject->getParam("track_max_deviation"));
+
+	// assign to track: max distance between track entries in pixels
+	mMaxDist = stod(mSubject->getParam("track_max_distance"));
+
+	// min confidence for counting vehicle
+	mClassify.countConfidence = stoi(mSubject->getParam("count_confidence"));
+
+	// horizontal counting position in pixels
+	mClassify.countPos = stoi(mSubject->getParam("count_pos_x")); 
+	
+	// min track length for counting vehicles
+	mClassify.trackLength = stoi(mSubject->getParam("count_track_length"));
+
+	// min truck size for classification
+	mClassify.truckSize = cv::Size2i(stoi(mSubject->getParam("truck_width_min")),
+		stoi(mSubject->getParam("truck_height_min")));
 }
 
 /// assign blobs to existing tracks
@@ -345,7 +339,7 @@ std::list<Track>& SceneTracker::updateTracks(list<TrackEntry>& blobs) {
 	while (iTrack != mTracks.end())
 	{
 
-		iTrack->updateTrack(blobs); // assign new blobs to existing track
+		iTrack->updateTrack(blobs, mMaxConfidence, mMaxDeviation, mMaxDist); // assign new blobs to existing track
 
 		if (iTrack->isMarkedForDelete())
 		{
@@ -363,6 +357,7 @@ std::list<Track>& SceneTracker::updateTracks(list<TrackEntry>& blobs) {
 	{
 		int trackID = nextTrackID();
 		if (trackID > 0)
+			// TODO check on trackID
 			mTracks.push_back(Track(*iBlob, trackID));
 		++iBlob;
 	}

@@ -34,16 +34,12 @@ public:
 /// a time sequence of the same shape (track), with the history of the shape occurances
 class Track {
 private:
-	const double mMaxDist;
-	const double mMaxDeviation;
-	const int mMaxConfidence;
 	cv::Point2d mAvgVelocity;
 	int mConfidence;
 	bool mCounted;
 	std::vector<TrackEntry> mHistory; // dimension: time
 	int mId;
 	bool mMarkedForDelete;
-	cv::Point2d mTrafficFlow;
 
 	cv::Point2d& updateAverageVelocity();
 
@@ -63,7 +59,8 @@ public:
 	bool isCounted();
 	bool isMarkedForDelete();
 	void setCounted(bool state);
-	void updateTrack(std::list<TrackEntry>& blobs);
+	void updateTrack(std::list<TrackEntry>& blobs, int maxConf, 
+		double maxDeviation, double maxDist);
 };
 
 /// recorder.h
@@ -73,21 +70,23 @@ public:
 /// 
 class SceneTracker : public Observer {
 private:
-	int mConfCreate;	// confidence above this level creates vehicle from unassigned track 
+	// adjustable parameters
 	ClassifyVehicle mClassify;
-	int mDistSubTrack;	// ToDo: change to const after testing
-	unsigned int mMaxNoIDs;
-	double mMinVelocityL2Norm;
+	int mMaxConfidence;
+	double mMaxDeviation;
+	double mMaxDist;
+	int mMaxNoIDs;
+
+	// variables
 	CountRecorder* mRecorder; 
 	std::list<Track> mTracks;
 	std::list<int> mTrackIDs;
-	cv::Point2d mTrafficFlow; // TODO delete after testing Track::hasSimilarVelocityVec
+
 public:
 	SceneTracker(Config* pConfig);
 
 	void attachCountRecorder(CountRecorder* pRecorder);
-	CountResults countVehicles(int frameCnt);
-
+	CountResults countVehicles(int frameCnt = 0);
 	int nextTrackID();
 	void printVehicles();
 	bool returnTrackID(int id);
@@ -97,5 +96,4 @@ public:
 	// DEBUG
 	void inspect(int frameCnt);
 	// END DEBUG
-
 };
