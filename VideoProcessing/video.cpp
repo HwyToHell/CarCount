@@ -5,12 +5,15 @@
 #include "../include/frame_handler.h"
 #include "../include/tracker.h"
 #include "../include/recorder.h"
+#include "../../../cpp/inc/program_options.h"
 
 using namespace std;
 
 int main(int argc, char* argv[]) {
-	/// TODO define region of interest --> TODO: select graphical -or- detect by optical flow
+	// TODO define region of interest --> TODO: select graphical -or- detect by optical flow
 	
+	ProgramOptions cmdLineOpts(argc, argv, "i:r:v:w:");
+	// Config config(ProgramOptions(argc, argv, "i:r:v:w:"), "video.sqlite")
 	Config config("video.sqlite");
 	Config* pConfig = &config;
 
@@ -33,12 +36,13 @@ int main(int argc, char* argv[]) {
 	list<Track> trackList;
 
 
-	if (!frameHandler.openCapSource(true)) 
-		return -1;
+	/* TODO un-comment after testing camera
+	 * if (!frameHandler.openCapSource(true)) 
+	 *	return -1;
+	 */
+
+	bool succ = frameHandler.openCapSource(false);
 	
-	//if (!frameHandler.openVideoOut("processed.avi"))	return -1;	
-
-
 
 	while(true)
 	{

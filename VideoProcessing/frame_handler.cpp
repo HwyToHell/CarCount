@@ -15,35 +15,6 @@ FrameHandler::FrameHandler(Config* pConfig) : Observer(pConfig), mMog2(100, 25, 
 	update();
 }
 
-void FrameHandler::update() {
-	mCapSource.deviceName = stoi(mSubject->getParam("video_device"));
-	mCapSource.fileName = mSubject->getParam("video_file");
-	mCapSource.path = mSubject->getParam("video_path");
-	mFramesize.x = stoi(mSubject->getParam("framesize_x"));
-	mFramesize.y = stoi(mSubject->getParam("framesize_y"));
-	// region of interest
-	mRoi.x = mSubject->getDouble("roi_x");
-	mRoi.y = mSubject->getDouble("roi_y");
-	mRoi.width = mSubject->getDouble("roi_width");
-	mRoi.height = mSubject->getDouble("roi_height");
-	// normalized roi, related to framesize
-	mRoiNorm.x = mRoi.x / mFramesize.x; 
-	mRoiNorm.width = mRoi.width / mFramesize.x;
-	mRoiNorm.y = mRoi.y / mFramesize.y;
-	mRoiNorm.height = mRoi.height / mFramesize.y;
-
-
-
-	// mBlobArea.min(200)		-> smaller blobs will be discarded 320x240=100   640x480=500
-	// mBlobArea.max(20000)		-> larger blobs will be discarded  320x240=10000 640x480=60000
-	mBlobArea.min = stoi(mSubject->getParam("blob_area_min"));
-	mBlobArea.max = stoi(mSubject->getParam("blob_area_max"));
-	// normalized blob area, related to frame size
-	mFrameArea = mFramesize.x * mFramesize.y;
-	
-
-}
-
 std::list<TrackEntry>& FrameHandler::calcBBoxes() {
 	// find boundig boxes of newly detected objects, store them in mBBoxes and return them
 	vector<vector<cv::Point> > contours;
@@ -72,6 +43,8 @@ int FrameHandler::getFrameInfo() {
 
 
 bool FrameHandler::openCapSource(bool fromFile) {
+
+
 	if (mCapture.isOpened())
 		mCapture.release();
 	if (fromFile) {
@@ -93,6 +66,12 @@ bool FrameHandler::openCapSource(bool fromFile) {
 	
 	mFramesize.x = (int)mCapture.get(CV_CAP_PROP_FRAME_WIDTH);
 	mFramesize.y = (int)mCapture.get(CV_CAP_PROP_FRAME_HEIGHT); 
+	
+	// test VideoCapture.set
+	bool succ = mCapture.set(CV_CAP_PROP_FRAME_WIDTH, 1600);
+	succ = mCapture.set(CV_CAP_PROP_FRAME_WIDTH, 1200);
+	int width = (int)mCapture.get(CV_CAP_PROP_FRAME_WIDTH);
+	int height = (int)mCapture.get(CV_CAP_PROP_FRAME_HEIGHT); 
 
 	// roi for new frame size, based on normalized roi
 	mRoi.x = mRoiNorm.x * mFramesize.x; 
@@ -192,6 +171,31 @@ void FrameHandler::showFrame(list<Track>& tracks, CountResults cr) {
 		cv::putText(mFrame, to_string((long long)cr.truckRight), cv::Point(185,230), 0, 0.5, green, 2);
 
 		cv::imshow(mFrameWndName, mFrame);
+}
+
+void FrameHandler::update() {
+	mCapSource.deviceName = stoi(mSubject->getParam("video_device"));
+	mCapSource.fileName = mSubject->getParam("video_file");
+	mCapSource.path = mSubject->getParam("video_path");
+	mFramesize.x = stoi(mSubject->getParam("framesize_x"));
+	mFramesize.y = stoi(mSubject->getParam("framesize_y"));
+	// region of interest
+	mRoi.x = stod(mSubject->getParam("roi_x"));
+	mRoi.y = stod(mSubject->getParam("roi_y"));
+	mRoi.width = stod(mSubject->getParam("roi_width"));
+	mRoi.height = stod(mSubject->getParam("roi_height"));
+	// normalized roi, related to framesize
+	mRoiNorm.x = mRoi.x / mFramesize.x; 
+	mRoiNorm.width = mRoi.width / mFramesize.x;
+	mRoiNorm.y = mRoi.y / mFramesize.y;
+	mRoiNorm.height = mRoi.height / mFramesize.y;
+	
+	// mBlobArea.min(200)		-> smaller blobs will be discarded 320x240=100   640x480=500
+	// mBlobArea.max(20000)		-> larger blobs will be discarded  320x240=10000 640x480=60000
+	mBlobArea.min = stoi(mSubject->getParam("blob_area_min"));
+	mBlobArea.max = stoi(mSubject->getParam("blob_area_max"));
+	// normalized blob area, related to frame size
+	mFrameArea = mFramesize.x * mFramesize.y;
 }
 
 

@@ -1,37 +1,29 @@
 /// TODO
+[2018-02-13]
+
 [2018-02-03]
-- Test cases for vehicle moved to tracker_refactor
 - Track::checkPosAndDir
 - parameters (to be specified in Config)
 	int count_pos (depends on frame_size)
 	int count_track_length (depends on frame_size)
 	cv::Point2i classify_truck_size (depends on frame_size)
-
-	
-
-
 [2017-01-28]
 OK - Track::isClose --> TrackEntry
 OK - TrackEntry::mVelocity --> Track
 - Track --> avgHeight, avgWidth (similar to avgVelocity)
-
-
 [2017-12-30]
 Track
 - define struct for parameters (maxDist, maxConfidence, trafficFlow)
-- passing parameters when constructing track
-- hold parameters in SceneTracker (update with observer pattern)
-
+OK - passing parameters when constructing track
+OK - hold parameters in SceneTracker (update with observer pattern)
 [2017-12-27]
 Config::init
 - move workDir logic to here
 - store workPath in ParamList
 Config
 - read from / write to config only at startup and closedown
-
 FrameHandler
 - norm parameters as function of framesize: roi, blob_area, track_max_distance, group_distance 
-
 Subject
 - get rid of getDouble, getString -> getParam 
 - double: stod(getParam)

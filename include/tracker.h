@@ -75,7 +75,7 @@ private:
 	int mMaxConfidence;
 	double mMaxDeviation;
 	double mMaxDist;
-	int mMaxNoIDs;
+	unsigned int mMaxNoIDs;
 
 	// variables
 	CountRecorder* mRecorder; 

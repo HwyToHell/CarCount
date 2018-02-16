@@ -22,22 +22,25 @@ private:
 		int max;
 	} mBlobArea;
 	double mFrameArea; // area of current framesize
+
 	struct CaptureSource {
 		int deviceName;
 		std::string fileName;
 		std::string path;
 	} mCapSource;
+	
+	std::list<TrackEntry> mBBoxes; // bounding boxes of newly detected objects
 	cv::VideoCapture mCapture;
+	cv::Mat mFrame;
+	cv::Mat mFgrMask; // foreground mask of moving objects
 	int mFrameCounter; 
 	cv::Point2i mFramesize;
-	Rect2d mRoi;	 // region of interest, within framesize
-	Rect2d mRoiNorm; // normalized roi, related to framesize
-	cv::Mat mFrame;
 	std::string mFrameWndName;
-	cv::Mat mFgrMask; // foreground mask of moving objects
 	cv::Mat mInset;
 	cv::BackgroundSubtractorMOG2 mMog2;
-	std::list<TrackEntry> mBBoxes; // bounding boxes of newly detected objects
+	Rect2d mRoi;	 // region of interest, within framesize
+	// TODO check, if can be deleted
+	Rect2d mRoiNorm; // normalized roi, related to framesize
 	cv::VideoWriter mVideoOut;
 public:
 	FrameHandler(Config* pConfig);

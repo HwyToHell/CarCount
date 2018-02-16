@@ -1,5 +1,7 @@
 #include "stdafx.h"
 #include "../include/config.h"
+#include <cctype> // isdigit()
+#include <io.h> // _access()
 
 using namespace std;
 
@@ -15,28 +17,51 @@ string Parameter::getType() const { return mType; }
 
 string Parameter::getValue() const { return mValue; }
 
-double Parameter::getDouble() const { return stod(mValue); }
-
 bool Parameter::setValue(string& value) {
 	mValue = value;
 	return true;
 }
 
+//////////////////////////////////////////////////////////////////////////////
+// Config ////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
 
-Config::Config(string dbFileName) {
-	bool success = false;
-	success = populateStdParams();
-	success = openDb(dbFileName);
-	if (!success)
-		cerr << __LINE__ << " error initializing config instance" << endl;
+Config::Config(string dbFileName)  : mDbFile(dbFileName) {
+
+	// TODO clear set-up of db open and close
+	bool success = populateStdParams();
+	if (dbFileName != "") {
+		success = openDb(dbFileName);
+		if (!success)
+			cerr << __LINE__ << " error initializing config instance" << endl;
+	}
+	else {
+		cerr << "no config file" << endl;
+		mDbHandle = nullptr;
+	}
 }
 
 Config::~Config() {
-	int rc = sqlite3_close(mDbHandle);
-	if (rc != SQLITE_OK)
-		cerr << __LINE__ << " data base was not closed correctly" << endl;
+	if (mDbHandle) {
+		int rc = sqlite3_close(mDbHandle);
+		if (rc != SQLITE_OK)
+			cerr << __LINE__ << " data base was not closed correctly" << endl;
+	}
 }
 
+class ParamEquals : public unary_function<Parameter, bool> {
+	string mName;
+public: 
+	ParamEquals (const string& name) : mName(name) {}
+	bool operator() (const Parameter& par) const { 
+		return (mName == par.getName());
+	}
+};
+
+string Config::getParam(string name) {
+	list<Parameter>::iterator iParam = find_if(mParamList.begin(), mParamList.end(), ParamEquals(name));
+	return (iParam->getValue());
+}
 
 bool Config::init() {
 	return loadParams();
@@ -50,12 +75,14 @@ bool Config::populateStdParams() {
 
 	/* TODO set standard parameters */
 	// TODO parameter for capFileName
-	// capFile, capDevice, framesize
+	// capFile, capDevice, framesize, framerate
 	mParamList.push_back(Parameter("video_file", "string", "traffic.avi"));
 	mParamList.push_back(Parameter("video_path", "string", "D:/Users/Holger/count_traffic/"));
 	mParamList.push_back(Parameter("video_device", "int", "0"));
+	mParamList.push_back(Parameter("is_video_from_cam", "bool", "false"));
 	mParamList.push_back(Parameter("framesize_x", "int", "320"));
 	mParamList.push_back(Parameter("framesize_y", "int", "240"));
+	mParamList.push_back(Parameter("frame_rate", "int", "10"));
 	// region of interest
 	mParamList.push_back(Parameter("roi_x", "int", "80"));
 	mParamList.push_back(Parameter("roi_y", "int", "80"));
@@ -80,7 +107,6 @@ bool Config::populateStdParams() {
 	return true;
 }
 
-
 bool Config::insertParam(Parameter param) {
 	mParamList.push_back(param);
 	return true;
@@ -94,9 +120,8 @@ bool Config::openDb(string dbFile) {
 		mDbFile = "carcounter.sqlite";
 	else mDbFile = dbFile;
 	
-	mWorkDir = "count_traffic";
 	mDbTblConfig = "config";
-	mDbPath = appendDirToPath(getHome(), mWorkDir);
+	mDbPath = mVideoPath;
 
 	if (!pathExists(mDbPath))
 		if (!makePath(mDbPath)) {
@@ -212,23 +237,131 @@ bool Config::queryDbSingle(const string& sql, string& value) {
 	return success;
 }
 
-class ParamEquals : public unary_function<Parameter, bool> {
-	string mName;
-public: 
-	ParamEquals (const string& name) : mName(name) {}
-	bool operator() (const Parameter& par) const { 
-		return (mName == par.getName());
-	}
-};
 
-double Config::getDouble(string name) {
-	list<Parameter>::iterator iParam = find_if(mParamList.begin(), mParamList.end(), ParamEquals(name));
-	return (iParam->getDouble());
+// TODO only perform lexical checks in this function
+//	physical test, e.g. file existence will be checked 
+bool Config::readCmdLine(ProgramOptions programOptions) {
+	// arguments
+	//  i(nput): cam (single digit number) or file name,
+	//		if empty take standard cam
+	//  r(ate):	fps for video device
+	//  v(ideo size): frame size in px (width x height)
+	//  w(orking directory): working dir, below $home
+
+	// TODO perform check after workdir has been checked
+	//  look for input file in
+	//		- current directory
+	//		- workdir
+
+	// i: video input from cam or file
+	if (programOptions.exists('i')) { 
+		string videoInput = programOptions.getOptArg('i');
+		// check if single digit -> cam
+		// check if file exists -> error message
+		if (videoInput.size() == 0) // use std cam
+			videoInput.append("0");
+		
+		if (videoInput.size() == 1) { // cam ID
+			string camID = videoInput.substr(0, 1);
+			
+			if (isdigit(camID.at(0))) { // cam ID must be int digit
+				setParam("video_device", camID);
+				setParam("is_video_from_cam", "true");
+			}
+			else {
+				cerr << "invalid argument: camera ID option '-i " << camID << "'" << endl;
+				cerr << "camera ID must be integer within range 0 ... 9" << endl;
+
+				return false;
+			}
+		}
+
+		else { // video file name
+			setParam("video_file", videoInput);
+			setParam("is_video_from_cam", "false");
+		}
+	} // end if (programOptions.exists('i'))
+
+	// r: frame rate in fps
+	if (programOptions.exists('r')) {
+		string frameRate = programOptions.getOptArg('r');
+		if (isInteger(frameRate)) {
+			setParam("frame_rate", frameRate);
+		}
+		else {
+			cerr << "invalid argument: frame rate option '-r " << frameRate << "'" << endl;
+			cerr << "frame rate must be integer" << endl;
+			return false;
+		}
+	} // end if (programOptions.exists('r'))
+
+	// v: video size
+	if (programOptions.exists('v')) {
+		string videoSize = programOptions.getOptArg('v');
+		string delimiter = "x";
+
+		size_t firstPos = 0;
+		size_t nextPos = videoSize.find_first_of(delimiter, firstPos);
+		string framesize_x = videoSize.substr(firstPos, nextPos);
+
+		if (isInteger(framesize_x))
+			setParam("framesize_x", framesize_x);
+		else {
+			cerr << "invalid argument: video size option '-v " << videoSize << "'" << endl;
+			cerr << "video width must be integer" << endl;
+			return false;
+		}
+
+		firstPos = nextPos + 1;
+		nextPos = videoSize.find_first_of(delimiter, firstPos);
+		string framesize_y = videoSize.substr(firstPos, nextPos);
+
+		if (isInteger(framesize_y))
+			setParam("framesize_y", framesize_y);
+		else {
+			cerr << "einvalid argument: video size option '-v " << videoSize << "'" << endl;
+			cerr << "video height must be integer" << endl;
+			return false;
+		}
+	} // end if (programOptions.exists('v'))
+
+	//  w: working directory, below $home
+	if (programOptions.exists('w')) {
+		string videoPath = appendDirToPath(mHomePath, programOptions.getOptArg('w'));
+		setParam("video_path", videoPath);
+	} // end if (programOptions.exists('w'))
+
+	return true;
 }
 
-string Config::getParam(string name) {
-	list<Parameter>::iterator iParam = find_if(mParamList.begin(), mParamList.end(), ParamEquals(name));
-	return (iParam->getValue());
+
+string& Config::readEnvHome() {
+	mHomePath.clear();
+
+	#if defined (_WIN32)
+		char *pHomeDrive, *pHomePath;
+		pHomeDrive = getenv("HOMEDRIVE");
+		if (pHomeDrive != nullptr)
+			mHomePath += pHomeDrive;
+		else {
+			cerr << __FILE__ << __LINE__ << 
+				" no home drive set in env" << endl;
+			return mHomePath;
+		}
+		pHomePath = getenv("HOMEPATH");
+		appendDirToPath(mHomePath, string(pHomePath));
+	#elif defined (__linux__)
+		char *pHomePath;
+		pHomePath = getenv("HOME");
+		if (pHome != nullptr)	{
+			home += pHome;
+			home += '/';
+		}
+	#else
+		throw 1;
+	#endif
+
+	return mHomePath;
 }
 
 bool Config::setParam(string name, string value) {
@@ -288,16 +421,16 @@ bool pathExists(string& path) {
 		{
 			DWORD lastError = GetLastError();
 			if (lastError != ERROR_FILE_NOT_FOUND && lastError != ERROR_PATH_NOT_FOUND)
-				throw 3;
+				throw "file access error";
 			return false;
 		}
 		else
 			return true;
 	#elif defined (__linux__)
 		// TODO use stat from <sys/stat.h>
-		throw 2;
+		throw "linux";
 	#else
-		throw 1;
+		throw "unsupported OS";
 	#endif
 }
 
@@ -315,9 +448,9 @@ bool makeDir(string& dir) {
 			return false;
 	#elif defined (__linux__)
 		// TODO use mkdir from <unistd.h>
-		throw 2;
+		throw "linux";
 	#else
-		throw 1;
+		throw "unsupported OS";
 	#endif
 }
 
@@ -327,7 +460,7 @@ bool makePath(string& path) {
 	#elif defined (__linux__)
 		char delim = '/';
 	#else
-		throw 1;
+		throw "unsupported OS";
 	#endif
 	bool success = true;
 	size_t pos = 0;
@@ -345,4 +478,33 @@ bool makePath(string& path) {
 		pos = path.find_first_of(delim, pos);
 	}
 	return success;
+}
+
+// TODO declare in header
+// test
+bool isFileExist(string& path) {
+	if (_access(path.c_str(), 0))
+		return true;
+	else
+		return false;
+}
+
+
+// String conversion functions
+bool isInteger(const string& str) {
+	string::const_iterator iString = str.begin();
+	while (iString != str.end() && isdigit(*iString))
+		++iString;
+	return !str.empty() && iString == str.end();
+}
+
+
+bool stob(string str) {
+	transform(str.begin(), str.end(), str.begin(), ::tolower);
+	if (str == "true")
+		return true;
+	else if (str == "false")
+		return false;
+	else
+		throw "bad bool string";
 }
