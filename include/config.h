@@ -44,12 +44,12 @@ public:
 	// TODO constructor for test cases, without reading config file
 	// Config();
 	~Config();
-	void calcFrameSizeDependentParams(); // TODO implementation
+	void adjustFrameSizeDependentParams(int new_size_x, int new_size_y); // TODO implementation
 	std::string getParam(std::string name);
 	bool init(); // TODO move logic to readEnv()	
 	bool insertParam(Parameter param);
 	bool populateStdParams();
-	bool readCmdLine(ProgramOptions po); // TODO implementation
+	bool readCmdLine(ProgramOptions po);
 	bool readConfigFile(); // TODO implementation
 	std::string& readEnvHome(); 
 	bool saveConfigToFile; // TODO implementation

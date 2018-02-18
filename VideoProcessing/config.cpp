@@ -5,6 +5,7 @@
 
 using namespace std;
 
+// observer.h
 void updateObserver(Observer* pObserver) {
 	pObserver->update();
 }
@@ -21,6 +22,15 @@ bool Parameter::setValue(string& value) {
 	mValue = value;
 	return true;
 }
+
+class ParamEquals : public unary_function<Parameter, bool> {
+	string mName;
+public: 
+	ParamEquals (const string& name) : mName(name) {}
+	bool operator() (const Parameter& par) const { 
+		return (mName == par.getName());
+	}
+};
 
 //////////////////////////////////////////////////////////////////////////////
 // Config ////////////////////////////////////////////////////////////////////
@@ -49,18 +59,68 @@ Config::~Config() {
 	}
 }
 
-class ParamEquals : public unary_function<Parameter, bool> {
-	string mName;
-public: 
-	ParamEquals (const string& name) : mName(name) {}
-	bool operator() (const Parameter& par) const { 
-		return (mName == par.getName());
+
+void Config::adjustFrameSizeDependentParams(int new_size_x, int new_size_y) {
+	int old_size_x = stoi(getParam("framesize_x"));
+	int old_size_y = stoi(getParam("framesize_y"));
+
+	try {
+		// roi
+		long long roi_x = stoi(getParam("roi_x")) * new_size_x / old_size_x;
+		long long roi_width =  stoi(getParam("roi_x")) * new_size_x / old_size_x;
+		long long roi_y = stoi(getParam("roi_y")) * new_size_y / old_size_y;
+		long long roi_height = stoi(getParam("roi_y")) * new_size_y / old_size_y;	
+		setParam("roi_x", to_string(roi_x));
+		setParam("roi_width", to_string(roi_width));
+		setParam("roi_y", to_string(roi_y));
+		setParam("roi_height", to_string(roi_height));
+
+		// blob assignment
+		long long blob_area_min =  stoi(getParam("blob_area_min")) * new_size_x * new_size_y 
+			/ old_size_x / old_size_y;
+		long long blob_area_max =  stoi(getParam("blob_area_max")) * new_size_x * new_size_y 
+			/ old_size_x / old_size_y;
+		setParam("blob_area_min", to_string(blob_area_min));
+		setParam("blob_area_max", to_string(blob_area_max));
+
+		// track assignment
+		long long track_max_dist =  stoi(getParam("track_max_distance")) * (new_size_x / old_size_x
+			+ new_size_y / old_size_y) / 2;
+		setParam("track_max_distance", to_string(track_max_dist));
+
+		// count pos, count track length
+		long long count_pos_x =  stoi(getParam("count_pos_x")) * new_size_x / old_size_x;
+		setParam("count_pos_x", to_string(count_pos_x));
+		long long count_track_length =  stoi(getParam("count_track_length")) * new_size_x / old_size_x;
+		setParam("count_track_length", to_string(count_track_length));
+
+		// truck_size
+		long long truck_width_min =  stoi(getParam("truck_width_min")) * new_size_x / old_size_x;
+		setParam("truck_width_min", to_string(truck_width_min));
+
+		// TODO next line "invalid argument exception"
+		long long truck_height_min =  stoi(getParam("truck_height_min")) * new_size_y / old_size_y;
+		setParam("truck_height_min", to_string(truck_height_min));
+
+		// save new frame size in config
+		setParam("framesize_x", to_string((long long)new_size_x));
+		setParam("framesize_y", to_string((long long)new_size_y));
 	}
-};
+	catch (exception& e) {
+		cerr << "invalid parameter in config: " << e.what() << endl;
+	}
+}
+
 
 string Config::getParam(string name) {
 	list<Parameter>::iterator iParam = find_if(mParamList.begin(), mParamList.end(), ParamEquals(name));
-	return (iParam->getValue());
+	if (iParam == mParamList.end()) {
+		cerr << "parameter not in config: " << name <<endl;
+		return string("");
+	}
+	else {
+		return (iParam->getValue());
+	}
 }
 
 bool Config::init() {
@@ -365,7 +425,8 @@ string& Config::readEnvHome() {
 }
 
 bool Config::setParam(string name, string value) {
-	list<Parameter>::iterator iParam = find_if(mParamList.begin(), mParamList.end(), ParamEquals(name));
+	list<Parameter>::iterator iParam = find_if(mParamList.begin(), mParamList.end(),
+		ParamEquals(name));
 	if (iParam == mParamList.end())
 		return false;
 	iParam->setValue(value);

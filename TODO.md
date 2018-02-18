@@ -1,6 +1,9 @@
 /// TODO
+[2018-02-16]
+- calcFrameSizeDependendParams
+- try catch for "invalid argument exception" by stoi
 [2018-02-13]
-
+OK - Config::readCmdLine
 [2018-02-03]
 - Track::checkPosAndDir
 - parameters (to be specified in Config)
