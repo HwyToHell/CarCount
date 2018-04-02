@@ -1,55 +1,60 @@
 #include "stdafx.h"
-#include "keypress.h"
 
+#include "../include/cam_cap_dshow.h"
 #include "../include/config.h"
 #include "../include/frame_handler.h"
 #include "../include/tracker.h"
 #include "../include/recorder.h"
 #include "../../../cpp/inc/program_options.h"
 
-using namespace std;
-
 
 int main(int argc, char* argv[]) {
+	using namespace std;
 
-	// cv::VideoCapture cap("D:/Users/Holger/count_traffic/traffic.avi");
-	cv::VideoCapture cap;
+	// set device
+	CamInput* pCamInput = new CamInput;
+	int iDevices = pCamInput->enumerateDevices();
+	bool success = pCamInput->setDevice(0);
+
 	
-	cap.open(0);
-		if (!cap.isOpened()) 	{
-		cout << "Cannot open camera" << endl;
+	// print capabilities of capture device in graph
+	int nCaps = pCamInput->enumerateStreamCaps();
+	for (int iCap = 0; iCap < nCaps; ++iCap) {
+		cv::Size frameSize = pCamInput->getResolution(iCap);
+		cout << iCap << " resolution: " << frameSize.width << "x" << frameSize.height << endl;
 	}
-	cout << "open - video size: " << cap.get(CV_CAP_PROP_FRAME_WIDTH) << "x" 
-		<< cap.get(CV_CAP_PROP_FRAME_HEIGHT) << endl;
 
-	int width = 320;
-	int height = 240;
-	if ( cap.set(CV_CAP_PROP_FRAME_WIDTH, width)
-		&& cap.set(CV_CAP_PROP_FRAME_WIDTH, height) )
-		cout << "resized to: " << width << "x" << height << endl;
+	// print actual resolution
+	if (pCamInput->setResolution(6)) {
+		double width = pCamInput->get(CV_CAP_PROP_FRAME_WIDTH);
+		double height = pCamInput->get(CV_CAP_PROP_FRAME_HEIGHT);
+		cout << "actual resolution: " << width << "x" << height << endl;
+	} else
+		cout << "resolution not set" << endl;
+		
+	// start graph
+	success = pCamInput->runGraph();
+	
+	// check, if graph is running
+	if (pCamInput->isGraphRunning()) {
+		cout << "graph running" << endl;
+	} else {
+		cout << "graph not running yet" << endl;
+	}
 
-	cout << "resized - video size: " << cap.get(CV_CAP_PROP_FRAME_WIDTH) << "x" 
-		<< cap.get(CV_CAP_PROP_FRAME_HEIGHT) << endl;
-
-	cv::Mat frame;
-	int cnt = 0;
-
-
-	while(cap.isOpened()) {
-		bool isSuccess = cap.read(frame);
-		if (!isSuccess) 		{
-			cout << "Cannot read frame from video file" << endl;
-			break;
-		}
-		cnt++;
-
-		cv::imshow("Origin", frame);
+	// display grabbed image
+	cv::Mat image;
+	while (pCamInput->read(image)) {
+		cv::imshow("grabbed image", image);
 
 		if (cv::waitKey(10) == 27) 	{
-			cout << "ESC pressed -> end video processing" << endl;
+			std::cout << "ESC pressed -> end video processing" << std::endl;
 			break;
 		}
 	}
+
+	//success = pCamInput->stopGraph(); // not necessary as stopGraph() called in D'tor
+	delete pCamInput;
 
 	cout << "Press <enter> to exit" << endl;
 	string str;

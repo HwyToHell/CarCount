@@ -4,28 +4,17 @@
 //
 
 #pragma once
-#include <opencv2/opencv.hpp>
 #include <windows.h>
 #include <conio.h>
-#include <direct.h> // for _mkdir
-#include <assert.h> // for vibe
-#include <time.h> // for vibe
-#include <iostream>
-#include <iomanip>
-#include <ctime>
+#include <direct.h>		// for _mkdir
+#include <assert.h>		// for vibe
+#include <time.h>		// for vibe
 #include <cmath>
-#include <string>
+#include <ctime>
+#include <iomanip>
+#include <iostream>
 #include <list>
+#include <string>
+#include <opencv2/opencv.hpp>
 #include <sqlite3.h>
 
-
-
-
-
-
-
-
-
-
-
-// TODO: reference additional headers your program requires here
