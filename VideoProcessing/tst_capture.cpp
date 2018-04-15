@@ -7,8 +7,8 @@
 #include "../include/recorder.h"
 #include "../../../cpp/inc/program_options.h"
 
-
-int main(int argc, char* argv[]) {
+// TODO rewrite with opencv compatible functions
+int alt_main(int argc, char* argv[]) {
 	using namespace std;
 
 	// set device

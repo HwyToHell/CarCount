@@ -1,9 +1,20 @@
 #include "stdafx.h"
 #include "../include/frame_handler.h"
 
-using namespace std;
+#include <sstream>
+
+
+
+
 
 FrameHandler::FrameHandler(Config* pConfig) : Observer(pConfig), mMog2(100, 25, false) {
+	using namespace std;
+
+	// instantiate cam input and enumerate available camera devices
+	m_winCapture = std::unique_ptr<CamInput>(new CamInput);
+	int iDevices = m_winCapture->enumerateDevices();
+
+	// load inset image to display counting results on
 	string inset_path = pConfig->getParam("video_path");
 	inset_path += "inset3.png";
 	cv::Mat inset_org = cv::imread(inset_path);
@@ -17,8 +28,8 @@ FrameHandler::FrameHandler(Config* pConfig) : Observer(pConfig), mMog2(100, 25, 
 
 std::list<TrackEntry>& FrameHandler::calcBBoxes() {
 	// find boundig boxes of newly detected objects, store them in mBBoxes and return them
-	vector<vector<cv::Point> > contours;
-	vector<cv::Vec4i> hierarchy;
+	std::vector<std::vector<cv::Point> > contours;
+	std::vector<cv::Vec4i> hierarchy;
 
 	mBBoxes.clear();
 
@@ -43,35 +54,39 @@ int FrameHandler::getFrameInfo() {
 
 
 bool FrameHandler::openCapSource(bool fromFile) {
+	using namespace std;
 
-
-	if (mCapture.isOpened())
-		mCapture.release();
+	//if (mCapture.isOpened())
+	//	mCapture.release();
 	if (fromFile) {
-		mCapture.open(mCapSource.path + mCapSource.fileName);
+	/*	mCapture.open(mCapSource.path + mCapSource.fileName);
 		if (!mCapture.isOpened()) {
 			cerr << "Cannot open file: " << mCapSource.path << mCapSource.fileName << endl;
 			return false;
+		}*/
+	} else {
+	#if defined (_WIN32)
+		m_winCapture->open(mCapSource.deviceName, 0); // TODO change resolution ID to private member
+		if (!m_winCapture->isOpened()) {
+			cerr << "Cannot open device: " << mCapSource.deviceName << endl;
+			return false;
 		}
-	} 
-	else {
+	#elif defined (__linux__)
 		mCapture.open(mCapSource.deviceName);
 		if (!mCapture.isOpened()) {
 			cerr << "Cannot open device: " << mCapSource.deviceName << endl;
 			return false;
 		}
+	#else
+		throw 1;
+	#endif
 	}
 	
 	mFrameCounter = 0;
 	
-	mFramesize.x = (int)mCapture.get(CV_CAP_PROP_FRAME_WIDTH);
-	mFramesize.y = (int)mCapture.get(CV_CAP_PROP_FRAME_HEIGHT); 
+	mFramesize.x = (int)m_winCapture->get(CV_CAP_PROP_FRAME_WIDTH);
+	mFramesize.y = (int)m_winCapture->get(CV_CAP_PROP_FRAME_HEIGHT); 
 	
-	// test VideoCapture.set
-	bool succ = mCapture.set(CV_CAP_PROP_FRAME_WIDTH, 1600);
-	succ = mCapture.set(CV_CAP_PROP_FRAME_WIDTH, 1200);
-	int width = (int)mCapture.get(CV_CAP_PROP_FRAME_WIDTH);
-	int height = (int)mCapture.get(CV_CAP_PROP_FRAME_HEIGHT); 
 
 	// roi for new frame size, based on normalized roi
 	mRoi.x = mRoiNorm.x * mFramesize.x; 
@@ -86,8 +101,8 @@ bool FrameHandler::openCapSource(bool fromFile) {
 	mBlobArea.max = (int) (max / mFrameArea * (double)(mFramesize.x * mFramesize.y) );
 	
 	// set framesize and roi in config, notify all observers
-	mSubject->setParam("framesize_x", to_string((long long)mFramesize.x));
-	mSubject->setParam("framesize_y", to_string((long long)mFramesize.y));
+	mSubject->setParam("frame_size_x", to_string((long long)mFramesize.x));
+	mSubject->setParam("frame_size_y", to_string((long long)mFramesize.y));
 	mSubject->setParam("roi_x", to_string((long long)mRoi.x));
 	mSubject->setParam("roi_y", to_string((long long)mRoi.y));
 	mSubject->setParam("roi_width", to_string((long long)mRoi.width));
@@ -101,7 +116,7 @@ bool FrameHandler::openCapSource(bool fromFile) {
 }
 
 
-bool FrameHandler::openVideoOut(string fileName) {
+bool FrameHandler::openVideoOut(std::string fileName) {
 	mVideoOut.open(mCapSource.path + fileName, CV_FOURCC('M','P','4','V'), 10, mFramesize);
 	if (!mVideoOut.isOpened())
 		return false;
@@ -110,9 +125,9 @@ bool FrameHandler::openVideoOut(string fileName) {
 
 
 bool FrameHandler::segmentFrame() {
-		bool isSuccess = mCapture.read(mFrame);
+		bool isSuccess = m_winCapture->read(mFrame);
 		if (!isSuccess) {
-			cout << "Cannot read frame from capture" << endl;
+			std::cout << "Cannot read frame from capture" << std::endl;
 			return false;
 		}
 
@@ -135,19 +150,20 @@ bool FrameHandler::segmentFrame() {
 		return true;
 }
 
-void FrameHandler::showFrame(list<Track>& tracks, CountResults cr) {
+
+void FrameHandler::showFrame(std::list<Track>& tracks, CountResults cr) {
 		// show inset with vehicle icons and arrows
 		mInset.copyTo(mFrame(cv::Rect(0,177, mInset.cols, mInset.rows)));
 		
 		// show frame counter, int font = cnt % 8;
-		cv::putText(mFrame, to_string((long long)mFrameCounter), cv::Point(10,20), 0, 0.5, green, 1);
+		cv::putText(mFrame, std::to_string((long long)mFrameCounter), cv::Point(10,20), 0, 0.5, green, 1);
 		cv::rectangle(mFrame, mRoi, blue);
 		cv::Scalar boxColor = green;
 		int line = Line::thin;
 
 		// show tracking boxes around vehicles
 		cv::Rect rec;
-		list<Track>::iterator iTrack = tracks.begin();
+		std::list<Track>::iterator iTrack = tracks.begin();
 		while (iTrack != tracks.end()){
 			rec = iTrack->getActualEntry().rect();
 			rec.x += (int)mRoi.x;
@@ -165,10 +181,10 @@ void FrameHandler::showFrame(list<Track>& tracks, CountResults cr) {
 		}
 
 		// show vehicle counter
-		cv::putText(mFrame, to_string((long long)cr.carLeft), cv::Point(125,206), 0, 0.5, green, 2);
-		cv::putText(mFrame, to_string((long long)cr.truckLeft), cv::Point(125,230), 0, 0.5, green, 2);
-		cv::putText(mFrame, to_string((long long)cr.carRight), cv::Point(185,206), 0, 0.5, green, 2);
-		cv::putText(mFrame, to_string((long long)cr.truckRight), cv::Point(185,230), 0, 0.5, green, 2);
+		cv::putText(mFrame, std::to_string((long long)cr.carLeft), cv::Point(125,206), 0, 0.5, green, 2);
+		cv::putText(mFrame, std::to_string((long long)cr.truckLeft), cv::Point(125,230), 0, 0.5, green, 2);
+		cv::putText(mFrame, std::to_string((long long)cr.carRight), cv::Point(185,206), 0, 0.5, green, 2);
+		cv::putText(mFrame, std::to_string((long long)cr.truckRight), cv::Point(185,230), 0, 0.5, green, 2);
 
 		cv::imshow(mFrameWndName, mFrame);
 }
@@ -177,8 +193,8 @@ void FrameHandler::update() {
 	mCapSource.deviceName = stoi(mSubject->getParam("video_device"));
 	mCapSource.fileName = mSubject->getParam("video_file");
 	mCapSource.path = mSubject->getParam("video_path");
-	mFramesize.x = stoi(mSubject->getParam("framesize_x"));
-	mFramesize.y = stoi(mSubject->getParam("framesize_y"));
+	mFramesize.x = stoi(mSubject->getParam("frame_size_x"));
+	mFramesize.y = stoi(mSubject->getParam("frame_size_y"));
 	// region of interest
 	mRoi.x = stod(mSubject->getParam("roi_x"));
 	mRoi.y = stod(mSubject->getParam("roi_y"));

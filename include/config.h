@@ -23,14 +23,14 @@ private:
 	// v(ideo size):		frame size in px (width x height)
 	// w(orking directory): working dir, starting in $home
 
-	sqlite3* mDbHandle;
-	std::string mDbFile;
-	std::string mDbPath;
-	std::string mDbTblConfig;
-	std::string mDbTblData; // table for time series
-	std::string mHomePath;
-	std::list<Parameter> mParamList;
-	std::string mVideoPath;
+	sqlite3*				mDbHandle;
+	std::string				mDbFile;
+	std::string				mDbPath;
+	std::string				mDbTblConfig;
+	std::string				mDbTblData; // table for time series
+	std::string				mHomePath;
+	std::list<Parameter>	mParamList;
+	std::string				mVideoPath;
 
 	// TODO 
 	// loadParam("all" - load all, "name" - load only param 'name')
@@ -44,16 +44,16 @@ public:
 	// TODO constructor for test cases, without reading config file
 	// Config();
 	~Config();
-	void adjustFrameSizeDependentParams(int new_size_x, int new_size_y); // TODO implementation
+	void		adjustFrameSizeDependentParams(int new_size_x, int new_size_y); // TODO implementation
 	std::string getParam(std::string name);
-	bool init(); // TODO move logic to readEnv()	
-	bool insertParam(Parameter param);
-	bool populateStdParams();
-	bool readCmdLine(ProgramOptions po);
-	bool readConfigFile(); // TODO implementation
-	std::string& readEnvHome(); 
-	bool saveConfigToFile; // TODO implementation
-	bool setParam(std::string name, std::string value);
+	bool		init(); // TODO move logic to readEnv()	
+	bool		insertParam(Parameter param);
+	bool		populateStdParams();
+	bool		readCmdLine(ProgramOptions po);
+	bool		readConfigFile(); // TODO implementation
+	std::string readEnvHome(); 
+	bool		saveConfigToFile; // TODO implementation
+	bool		setParam(std::string name, std::string value);
 };
 
 

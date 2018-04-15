@@ -3,6 +3,7 @@
 /// in case VideoCapture::set(CV_CAP_PROP_FRAME_XXXXX)
 /// for setting frame size does not work
 
+#pragma once
 #include <string>
 #include <vector>
 #include <DShow.h>
@@ -38,26 +39,31 @@ private:
 	IBaseFilter*			m_camSrcFilter;
 	IBaseFilter*			m_grabFilter;
 	IBaseFilter*			m_renderFilter;
+	bool					m_isOpened;
 	DWORD					m_registerRot;			// debugging with graphedt
 
-	bool addCamSrcFilter(int deviceID, IGraphBuilder* pGraph);
-	bool addGrabFilter(IGraphBuilder* pGraph);
-	bool addNullRenderFilter(IGraphBuilder* pGraph);
+	bool			addCamSrcFilter(int deviceID, IGraphBuilder* pGraph);
+	bool			addGrabFilter(IGraphBuilder* pGraph);
+	bool			addNullRenderFilter(IGraphBuilder* pGraph);
+	int				enumerateStreamCaps();
+	std::wstring	getDevice(int deviceID);
+	cv::Size		getResolution(int resID);
+	bool			isGraphRunning();
+	bool			runGraph();
+	cv::Size2d		selectCamResolution(int defaultResolutionID);
+	bool			setDevice(int deviceID);
+	bool			setResolution(int capabilityID);
+	bool			stopGraph();
 
 public:
 	CamInput();
 	~CamInput();
 
 	int				enumerateDevices();
-	int				enumerateStreamCaps();
-	double			get(int propID);				// get frame size for opencv compatibility
-	std::wstring	getDevice(int deviceID);
-	cv::Size		getResolution(int capabilityID);
-	bool			isGraphRunning();
-	void			printStreamCaps();
-	bool			read(cv::Mat& bitmap);
-	bool			runGraph();
-	bool			setDevice(int deviceID);
-	bool			setResolution(int capabilityID);
-	bool			stopGraph();
+	double			get(int propID);				// opencv get frame size
+	bool			isOpened();						// opencv
+	bool			open(int deviceID);				// opencv
+	bool			open(int deviceID, int resolutionID);
+	bool			read(cv::Mat& bitmap);			// opencv 
+	void			release();						// opencv
 };

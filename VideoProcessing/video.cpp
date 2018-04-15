@@ -21,6 +21,10 @@ int main(int argc, char* argv[]) {
 	FrameHandler* pFrameHandler = &frameHandler;
 	config.attach(pFrameHandler);
 
+	// capSource must be open in order to set frame size
+	bool succ = frameHandler.openCapSource(false);
+
+
 	SceneTracker scene(pConfig); // collection of tracks and vehicles with MOG2
 	SceneTracker* pScene = &scene;
 	config.attach(pScene);
@@ -41,7 +45,7 @@ int main(int argc, char* argv[]) {
 	 *	return -1;
 	 */
 
-	bool succ = frameHandler.openCapSource(false);
+
 	
 
 	while(true)

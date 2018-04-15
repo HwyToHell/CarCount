@@ -1,7 +1,9 @@
 #include "stdafx.h"
 #include "../include/config.h"
+
 #include <cctype> // isdigit()
 #include <io.h> // _access()
+
 
 using namespace std;
 
@@ -40,6 +42,8 @@ Config::Config(string dbFileName)  : mDbFile(dbFileName) {
 
 	// TODO clear set-up of db open and close
 	bool success = populateStdParams();
+	mVideoPath = getParam("video_path");
+
 	if (dbFileName != "") {
 		success = openDb(dbFileName);
 		if (!success)
@@ -61,8 +65,8 @@ Config::~Config() {
 
 
 void Config::adjustFrameSizeDependentParams(int new_size_x, int new_size_y) {
-	int old_size_x = stoi(getParam("framesize_x"));
-	int old_size_y = stoi(getParam("framesize_y"));
+	int old_size_x = stoi(getParam("frame_size_x"));
+	int old_size_y = stoi(getParam("frame_size_y"));
 
 	try {
 		// roi
@@ -103,8 +107,8 @@ void Config::adjustFrameSizeDependentParams(int new_size_x, int new_size_y) {
 		setParam("truck_height_min", to_string(truck_height_min));
 
 		// save new frame size in config
-		setParam("framesize_x", to_string((long long)new_size_x));
-		setParam("framesize_y", to_string((long long)new_size_y));
+		setParam("frame_size_x", to_string((long long)new_size_x));
+		setParam("frame_size_y", to_string((long long)new_size_y));
 	}
 	catch (exception& e) {
 		cerr << "invalid parameter in config: " << e.what() << endl;
@@ -140,8 +144,9 @@ bool Config::populateStdParams() {
 	mParamList.push_back(Parameter("video_path", "string", "D:/Users/Holger/count_traffic/"));
 	mParamList.push_back(Parameter("video_device", "int", "0"));
 	mParamList.push_back(Parameter("is_video_from_cam", "bool", "false"));
-	mParamList.push_back(Parameter("framesize_x", "int", "320"));
-	mParamList.push_back(Parameter("framesize_y", "int", "240"));
+	mParamList.push_back(Parameter("frame_size_id", "int", "0"));
+	mParamList.push_back(Parameter("frame_size_x", "int", "320"));
+	mParamList.push_back(Parameter("frame_size_y", "int", "240"));
 	mParamList.push_back(Parameter("frame_rate", "int", "10"));
 	// region of interest
 	mParamList.push_back(Parameter("roi_x", "int", "80"));
@@ -365,7 +370,7 @@ bool Config::readCmdLine(ProgramOptions programOptions) {
 		string framesize_x = videoSize.substr(firstPos, nextPos);
 
 		if (isInteger(framesize_x))
-			setParam("framesize_x", framesize_x);
+			setParam("frame_size_x", framesize_x);
 		else {
 			cerr << "invalid argument: video size option '-v " << videoSize << "'" << endl;
 			cerr << "video width must be integer" << endl;
@@ -377,9 +382,9 @@ bool Config::readCmdLine(ProgramOptions programOptions) {
 		string framesize_y = videoSize.substr(firstPos, nextPos);
 
 		if (isInteger(framesize_y))
-			setParam("framesize_y", framesize_y);
+			setParam("frame_size_y", framesize_y);
 		else {
-			cerr << "einvalid argument: video size option '-v " << videoSize << "'" << endl;
+			cerr << "invalid argument: video size option '-v " << videoSize << "'" << endl;
 			cerr << "video height must be integer" << endl;
 			return false;
 		}
@@ -395,7 +400,7 @@ bool Config::readCmdLine(ProgramOptions programOptions) {
 }
 
 
-string& Config::readEnvHome() {
+std::string Config::readEnvHome() {
 	mHomePath.clear();
 
 	#if defined (_WIN32)
@@ -423,6 +428,7 @@ string& Config::readEnvHome() {
 
 	return mHomePath;
 }
+
 
 bool Config::setParam(string name, string value) {
 	list<Parameter>::iterator iParam = find_if(mParamList.begin(), mParamList.end(),

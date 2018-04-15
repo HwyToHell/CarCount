@@ -5,9 +5,9 @@
 
 #pragma once
 #include <windows.h>
+#include <assert.h>		// for vibe
 #include <conio.h>
 #include <direct.h>		// for _mkdir
-#include <assert.h>		// for vibe
 #include <time.h>		// for vibe
 #include <cmath>
 #include <ctime>

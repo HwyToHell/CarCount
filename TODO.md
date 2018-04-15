@@ -1,4 +1,8 @@
 /// TODO
+[2018-04-15]
+- cmd line args: -q quiet flag (automatically takes pre-selected items in pick list)
+- implement changes in cmd line arg parsing (see ppt in red)
+- feed back changed frame size to config
 [2018-02-16]
 - calcFrameSizeDependendParams
 - try catch for "invalid argument exception" by stoi

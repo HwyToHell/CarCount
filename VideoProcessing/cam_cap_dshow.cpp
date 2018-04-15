@@ -6,9 +6,11 @@
 #include "stdafx.h"
 
 #include "../include/cam_cap_dshow.h"
-
 #include <algorithm>
 #include <cstring>		// memcpy
+#include "../../../cpp/inc/pick_list.h"
+
+
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -273,6 +275,8 @@ CamInput::CamInput() {
 	m_grabFilter = nullptr;
 	m_renderFilter = nullptr;
 
+	m_isOpened = false;
+
 	// add sample grabber callback
 	m_sGrabCallBack = new SampleGrabberCallback;
 }
@@ -320,15 +324,17 @@ bool CamInput::addCamSrcFilter(int deviceID, IGraphBuilder* pGraph) {
 	IMoniker* pMoniker = nullptr;
 	
 	// deviceNumber out of range
-	if (deviceID >= (int)m_deviceArray.size())
+	if (deviceID >= (int)m_deviceArray.size()) {
+		cerr << "addCamSrcFilter: device id out of range" << endl;
 		return false;
-	else
+	} else {
 		pMoniker = m_deviceArray.at(deviceID).pMoniker;
+	}
 
 	// create capture filter object
 	HRESULT hr = pMoniker->BindToObject(0,0,IID_IBaseFilter, (void**)&m_camSrcFilter);
 	if (FAILED(hr)) {
-		cerr << "addCapFilter: cannot access video capture device "
+		cerr << "addCamSrcFilter: cannot access video capture device "
 			<< deviceID << endl;  
 		m_camSrcFilter->Release();
 		throw "com error";
@@ -338,7 +344,7 @@ bool CamInput::addCamSrcFilter(int deviceID, IGraphBuilder* pGraph) {
 	// add capture filter to graph
 	hr = pGraph->AddFilter(m_camSrcFilter, L"Capture Filter");
 	if (FAILED(hr)) {
-		cerr << "addCapFilter: cannot add capture filter to graph" << endl;   
+		cerr << "addCamSrcFilter: cannot add capture filter to graph" << endl;   
 		m_camSrcFilter->Release();
 		throw "com error";
 		return false;
@@ -413,7 +419,9 @@ bool CamInput::addNullRenderFilter(IGraphBuilder* pGraph) {
 }
 
 
-// enumerate camera devices and get their friendly names
+// enumerate camera devices, get their friendly names
+// and store them in m_deviceArray
+// return: number of available devices
 int CamInput::enumerateDevices() {
 	using namespace std;
 	
@@ -509,6 +517,8 @@ bool isUncompressed(GUID mediaSubtype) {
 
 
 // stream capabilities contain possible frame sizes (VIDEOINFOHEADER -> BITMAPINFOHEADER)
+// enumerate them and store data structure in m_streamCapsArray
+// return: number of available capabilites
 int CamInput::enumerateStreamCaps() {
 	using namespace std;
 	
@@ -618,6 +628,189 @@ cv::Size CamInput::getResolution(int capabilityID) {
 }
 
 
+// test if filter graph is running and rendering data
+bool CamInput::isGraphRunning() {
+	using namespace std;
+	FILTER_STATE filterState = State_Stopped;
+
+	if (m_mediaControl) {
+		HRESULT hr = m_mediaControl->GetState(100, (OAFilterState*)&filterState);
+		if(FAILED(hr)) {
+			cerr << "isGraphRunning: cannot get filter state!" << endl;   
+			throw "com error";
+		} else { // HRESULT == S_OK
+			if (filterState == State_Running)
+				return true;
+			else
+				return false;
+		}
+	} else { // media control member not initialized yet
+		return false;
+	}
+}
+
+
+// cv::VideoCapture::isOpened() compatible
+// checks, if setDevice() has been performed successfully
+bool CamInput::isOpened() {
+	if (m_isOpened)
+		return true;
+	else
+		return false;
+}
+
+
+// cv::VideoCapture::open() compatible
+// wrapper for setDevice()
+bool CamInput::open(int deviceID) {
+	if (deviceID < 0 || deviceID >= static_cast<int>(m_deviceArray.size())) {
+		std::cerr << "device id out of range" << std::endl;
+		return false;
+	} else {
+		m_isOpened = setDevice(deviceID);
+		return m_isOpened;
+	}
+}
+
+
+cv::Size2d CamInput::selectCamResolution(int defaultResolutionID) {
+	using namespace std;
+
+	// frameSizeId = pre-selection for pick list
+	cv::Size2d frameSize = cv::Size(0, 0);
+
+	// enumerate available resolutions to array
+	PickList::StrArray frameSizeArray;
+	int nCaps = enumerateStreamCaps();
+	if (nCaps == 0) {
+		cerr << "setCamResolution: no stream capablities available" << endl;
+		return frameSize;
+	}
+	for (int iCap = 0; iCap < nCaps; ++iCap) {
+		cv::Size fs = getResolution(iCap);
+		stringstream ssFrameSize;
+		ssFrameSize << " resolution: " << fs.width << "x" << fs.height << endl;
+		frameSizeArray.push_back(ssFrameSize.str());
+	}
+
+	// select one from pick list
+	PickList resolution("resolution", &frameSizeArray);
+	if (defaultResolutionID >= static_cast<int>(frameSizeArray.size()) ) {
+		cerr << "default resolution ID out of range -> set to zero" << endl;
+		defaultResolutionID = 0;
+	}
+	resolution.setSelection(defaultResolutionID);
+	
+	// set selected resolution
+	int frameSizeId = resolution.getSelection();
+	if (!setResolution(frameSizeId)) {
+		cerr << "setCamResolution: resolution cannot be set" << endl;
+	} else {
+		frameSize.width = get(CV_CAP_PROP_FRAME_WIDTH);
+		frameSize.height = get(CV_CAP_PROP_FRAME_HEIGHT);
+	}
+
+	return frameSize;
+}
+
+
+bool CamInput::open(int deviceID, int resolutionID) {
+	using namespace std;
+
+	// device ID must be within range
+	if (deviceID < 0 || deviceID >= static_cast<int>(m_deviceArray.size())) {
+		cerr << "open: device id out of range" << endl;
+		return false;
+	}
+
+	// filter graph must be initialized in order to set resolution
+	m_isOpened = setDevice(deviceID);
+	if (!m_isOpened) {
+		cerr << "open: initializing filter graph failed" << endl;
+		return false;
+	}
+
+	// cam resolution must be set to available values
+	cv::Size2d frameSize = selectCamResolution(resolutionID);
+	if (frameSize.height == 0 || frameSize.width == 0) {
+		cerr << "open: resolution not set" << endl;
+		return false;
+	}
+
+	// run filter graph
+	if (runGraph())
+		return true;
+	else
+		return false;
+}
+
+
+
+
+// cv::VideoCapture::read() compatible
+// check isGraphRunning before calling this function
+// TODO implement dropped frames counter (if application is not fast enough)
+bool CamInput::read(cv::Mat& bitmap) {
+	using namespace cv;
+	using namespace std;
+
+	// graph must run in order to grab frames
+	if(!isGraphRunning()) {
+		cerr << "read: filter graph does not run" << endl;
+		return false;
+	}
+
+	// frame size
+	int width = static_cast<int>(get(CV_CAP_PROP_FRAME_WIDTH));
+	int height = static_cast<int>(get(CV_CAP_PROP_FRAME_HEIGHT));
+
+	// wait max 2000ms (= 0.5 fps) for new frame
+	HANDLE hNewFrameEvent = m_sGrabCallBack->getNewFrameEventHandle();
+	DWORD dwStatus = WaitForSingleObject(hNewFrameEvent, 2000); 
+
+	// assign buffer to mat if new frame available
+	if (dwStatus == WAIT_OBJECT_0) {
+		BYTE* buffer = m_sGrabCallBack->getBitmap();
+		Mat image(height, width, CV_8UC3, buffer);
+		image.copyTo(bitmap);
+		if (ResetEvent(hNewFrameEvent))
+			return true;
+		else {
+			cerr << "read: cannot reset new frame event" << endl;
+			return false;
+		}
+
+	// return false if timed out
+	} else if (dwStatus == WAIT_TIMEOUT) {
+		cout << "read: no new frames available anymore" << endl;
+		return false;
+	
+	// error message otherwise
+	} else {
+		cerr << "read: error on waiting for event" << endl;
+		return false;
+	}
+}
+
+
+void CamInput::release() {
+	stopGraph();
+}
+
+// start capturing frames
+bool CamInput::runGraph() {
+	using namespace std;
+	HRESULT hr = m_mediaControl->Run();
+	if (FAILED(hr)) {
+		cerr << "runGraph: cannot run graph!" << endl;
+		throw "com error";
+		return false;
+	} else {
+		return true;
+	}
+}
+
+
 // set camera device, build and initialize filter graph
 bool CamInput::setDevice(int deviceID) {
 	using namespace std;
@@ -713,91 +906,6 @@ bool CamInput::setDevice(int deviceID) {
 	bool success = addToRot(m_graphBuilder, &m_registerRot);
 
 	return true;
-}
-
-
-// test if filter graph is running and rendering data
-bool CamInput::isGraphRunning() {
-	using namespace std;
-	FILTER_STATE filterState = State_Stopped;
-
-	if (m_mediaControl) {
-		HRESULT hr = m_mediaControl->GetState(100, (OAFilterState*)&filterState);
-		if(FAILED(hr)) {
-			cerr << "isGraphRunning: cannot get filter state!" << endl;   
-			throw "com error";
-		} else { // HRESULT == S_OK
-			if (filterState == State_Running)
-				return true;
-			else
-				return false;
-		}
-	} else { // media control member not initialized yet
-		return false;
-	}
-}
-
-
-// TODO delete, implement in application by calling getResolution(capabilityID)
-void CamInput::printStreamCaps() {
-	using namespace std;
-	for (size_t n = 0; n < m_streamCapsArray.size(); ++n) {
-		int width = m_streamCapsArray.at(n).bmiHeader.biWidth;
-		int height = m_streamCapsArray.at(n).bmiHeader.biHeight;
-		cout << n << " resolution: " << width << "x" << height << endl;
-	}
-}
-
-
-// cv::VideoCapture::read() compatible
-// check isGraphRunning before calling this function
-// TODO implement dropped frames counter (if application is not fast enough)
-bool CamInput::read(cv::Mat& bitmap) {
-	using namespace cv;
-	using namespace std;
-	int width = (int)get(CV_CAP_PROP_FRAME_WIDTH);
-	int height = (int)get(CV_CAP_PROP_FRAME_HEIGHT);
-
-	// wait max 2000ms (= 0.5 fps) for new frame
-	HANDLE hNewFrameEvent = m_sGrabCallBack->getNewFrameEventHandle();
-	DWORD dwStatus = WaitForSingleObject(hNewFrameEvent, 2000); 
-
-	// assign buffer to mat if new frame available
-	if (dwStatus == WAIT_OBJECT_0) {
-		BYTE* buffer = m_sGrabCallBack->getBitmap();
-		Mat image(height, width, CV_8UC3, buffer);
-		image.copyTo(bitmap);
-		if (ResetEvent(hNewFrameEvent))
-			return true;
-		else {
-			cerr << "read: cannot reset new frame event" << endl;
-			return false;
-		}
-
-	// return false if timed out
-	} else if (dwStatus == WAIT_TIMEOUT) {
-		cout << "read: no new frames available anymore" << endl;
-		return false;
-	
-	// error message otherwise
-	} else {
-		cerr << "read: error on waiting for event" << endl;
-		return false;
-	}
-}
-
-
-// start capturing frames
-bool CamInput::runGraph() {
-	using namespace std;
-	HRESULT hr = m_mediaControl->Run();
-	if (FAILED(hr)) {
-		cerr << "runGraph: cannot run graph!" << endl;
-		throw "com error";
-		return false;
-	} else {
-		return true;
-	}
 }
 
 
