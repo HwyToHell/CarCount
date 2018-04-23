@@ -21,7 +21,8 @@ class FrameHandler : public Observer {
 public:
 	FrameHandler(Config* pConfig);
 	std::list<TrackEntry>&	calcBBoxes();
-	int						getFrameInfo();
+	int						getFrameInfo(); // #channels, depth, type
+	cv::Size2d				getFrameSize();
 	bool					openCapSource(bool fromFile = true);
 	bool					openVideoOut(std::string fileName);
 	bool					segmentFrame();
@@ -47,7 +48,7 @@ private:
 	typedef cv::BackgroundSubtractorMOG2 BackgrndSubtrac;
 	
 	std::list<TrackEntry>		mBBoxes; // bounding boxes of newly detected objects
-	//cv::VideoCapture			mCapture;
+	cv::VideoCapture			mCapture;
 	std::unique_ptr<CamInput>	m_winCapture; // substitute for cv::VideoCapture
 	cv::Mat						mFrame;
 	cv::Mat						mFgrMask; // foreground mask of moving objects

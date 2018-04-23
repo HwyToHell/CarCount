@@ -15,7 +15,7 @@ FrameHandler::FrameHandler(Config* pConfig) : Observer(pConfig), mMog2(100, 25, 
 	int iDevices = m_winCapture->enumerateDevices();
 
 	// load inset image to display counting results on
-	string inset_path = pConfig->getParam("video_path");
+	string inset_path = pConfig->getParam("work_path");
 	inset_path += "inset3.png";
 	cv::Mat inset_org = cv::imread(inset_path);
 	if (!inset_org.data)
@@ -45,11 +45,20 @@ std::list<TrackEntry>& FrameHandler::calcBBoxes() {
 	return mBBoxes;
 }
 
+
 int FrameHandler::getFrameInfo() {
 	int ch = mFrame.channels();
 	int de = mFrame.depth();
 	int type = mFrame.type();
 	return type;
+}
+
+
+cv::Size2d FrameHandler::getFrameSize() {
+	cv::Size2d frameSize = cv::Size2d(0,0);
+	frameSize.width = mCapture.get(CV_CAP_PROP_FRAME_WIDTH);
+	frameSize.height = mCapture.get(CV_CAP_PROP_FRAME_HEIGHT);
+	return frameSize;
 }
 
 
@@ -192,7 +201,7 @@ void FrameHandler::showFrame(std::list<Track>& tracks, CountResults cr) {
 void FrameHandler::update() {
 	mCapSource.deviceName = stoi(mSubject->getParam("video_device"));
 	mCapSource.fileName = mSubject->getParam("video_file");
-	mCapSource.path = mSubject->getParam("video_path");
+	mCapSource.path = mSubject->getParam("work_path");
 	mFramesize.x = stoi(mSubject->getParam("frame_size_x"));
 	mFramesize.y = stoi(mSubject->getParam("frame_size_y"));
 	// region of interest

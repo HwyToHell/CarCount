@@ -30,14 +30,16 @@ private:
 	std::string				mDbTblData; // table for time series
 	std::string				mHomePath;
 	std::list<Parameter>	mParamList;
-	std::string				mVideoPath;
+	std::string				m_workPath; // TODO delete?
+	std::string				m_videoFilePath;
 
 	// TODO 
 	// loadParam("all" - load all, "name" - load only param 'name')
-	bool loadParams(); // TODO move logic to readEnv()	
-	bool saveParams(); // TODO move logic to readEnv()
-	bool openDb(std::string dbFile);
-	bool queryDbSingle(const std::string& sql, std::string& value);
+	bool					loadParams(); // TODO move logic to readEnv()	
+	bool					openDb(std::string dbFile);
+	bool					queryDbSingle(const std::string& sql, std::string& value);
+	std::string				readEnvHome();
+	bool					saveParams(); // TODO move logic to readEnv()
 
 public:
 	Config(std::string dbFileName = "");
@@ -48,22 +50,23 @@ public:
 	std::string getParam(std::string name);
 	bool		init(); // TODO move logic to readEnv()	
 	bool		insertParam(Parameter param);
+	bool		locateVideoFile(std::string fileName);
 	bool		populateStdParams();
 	bool		readCmdLine(ProgramOptions po);
 	bool		readConfigFile(); // TODO implementation
-	std::string readEnvHome(); 
 	bool		saveConfigToFile; // TODO implementation
 	bool		setParam(std::string name, std::string value);
 };
 
 
 // Directory manipulation functions
-std::string getHome();
-std::string& appendDirToPath(std::string& path, std::string& dir);
-bool pathExists(std::string& path);
-bool makeDir(std::string& dir);
-bool makePath(std::string& path);
+std::string		getHome();
+std::string&	appendDirToPath(std::string& path, const std::string& dir);
+bool			isFileExist(const std::string& path);
+bool			pathExists(const std::string& path); // TODO delete, us isFileExist instead
+bool			makeDir(const std::string& dir);
+bool			makePath(std::string path);
 
 // String conversion functions
-bool isInteger(const std::string& str);
-bool stob(std::string str);
+bool			isInteger(const std::string& str);
+bool			stob(std::string str); // string to bool

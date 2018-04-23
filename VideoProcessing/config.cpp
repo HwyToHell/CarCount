@@ -4,6 +4,7 @@
 #include <cctype> // isdigit()
 #include <io.h> // _access()
 
+#pragma warning(disable: 4996)
 
 using namespace std;
 
@@ -12,23 +13,23 @@ void updateObserver(Observer* pObserver) {
 	pObserver->update();
 }
 
-Parameter::Parameter(string name, string type, string value) : mName(name), mType(type), mValue(value) {}
+Parameter::Parameter(std::string name, std::string type, std::string value) : mName(name), mType(type), mValue(value) {}
 
-string Parameter::getName() const { return mName; }
+std::string Parameter::getName() const { return mName; }
 
-string Parameter::getType() const { return mType; }
+std::string Parameter::getType() const { return mType; }
 
-string Parameter::getValue() const { return mValue; }
+std::string Parameter::getValue() const { return mValue; }
 
-bool Parameter::setValue(string& value) {
+bool Parameter::setValue(std::string& value) {
 	mValue = value;
 	return true;
 }
 
 class ParamEquals : public unary_function<Parameter, bool> {
-	string mName;
+	std::string mName;
 public: 
-	ParamEquals (const string& name) : mName(name) {}
+	ParamEquals (const std::string& name) : mName(name) {}
 	bool operator() (const Parameter& par) const { 
 		return (mName == par.getName());
 	}
@@ -38,11 +39,11 @@ public:
 // Config ////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-Config::Config(string dbFileName)  : mDbFile(dbFileName) {
+Config::Config(std::string dbFileName)  : mDbFile(dbFileName) {
 
 	// TODO clear set-up of db open and close
 	bool success = populateStdParams();
-	mVideoPath = getParam("video_path");
+	m_workPath = getParam("work_path");
 
 	if (dbFileName != "") {
 		success = openDb(dbFileName);
@@ -116,7 +117,8 @@ void Config::adjustFrameSizeDependentParams(int new_size_x, int new_size_y) {
 }
 
 
-string Config::getParam(string name) {
+std::string Config::getParam(std::string name) {
+	using namespace	std;
 	list<Parameter>::iterator iParam = find_if(mParamList.begin(), mParamList.end(), ParamEquals(name));
 	if (iParam == mParamList.end()) {
 		cerr << "parameter not in config: " << name <<endl;
@@ -134,84 +136,15 @@ bool Config::init() {
 
 }
 
-bool Config::populateStdParams() {
-	mParamList.clear();
-
-	/* TODO set standard parameters */
-	// TODO parameter for capFileName
-	// capFile, capDevice, framesize, framerate
-	mParamList.push_back(Parameter("video_file", "string", "traffic.avi"));
-	mParamList.push_back(Parameter("video_path", "string", "D:/Users/Holger/count_traffic/"));
-	mParamList.push_back(Parameter("video_device", "int", "0"));
-	mParamList.push_back(Parameter("is_video_from_cam", "bool", "false"));
-	mParamList.push_back(Parameter("frame_size_id", "int", "0"));
-	mParamList.push_back(Parameter("frame_size_x", "int", "320"));
-	mParamList.push_back(Parameter("frame_size_y", "int", "240"));
-	mParamList.push_back(Parameter("frame_rate", "int", "10"));
-	// region of interest
-	mParamList.push_back(Parameter("roi_x", "int", "80"));
-	mParamList.push_back(Parameter("roi_y", "int", "80"));
-	mParamList.push_back(Parameter("roi_width", "int", "180"));
-	mParamList.push_back(Parameter("roi_height", "int", "80"));
-	// blob assignment
-	mParamList.push_back(Parameter("blob_area_min", "int", "200"));
-	mParamList.push_back(Parameter("blob_area_max", "int", "20000"));
-	// track assignment
-	mParamList.push_back(Parameter("track_max_confidence", "int", "4"));
-	mParamList.push_back(Parameter("track_max_deviation", "double", "80"));
-	mParamList.push_back(Parameter("track_max_distance", "double", "30"));
-	// scene tracker
-	mParamList.push_back(Parameter("max_n_of_tracks", "int", "9")); // maxNoIDs
-	// counting
-	mParamList.push_back(Parameter("count_confidence", "int", "3"));
-	mParamList.push_back(Parameter("count_pos_x", "int", "90")); // counting position (within roi)
-	mParamList.push_back(Parameter("count_track_length", "int", "20")); // min track length for counting
-	// classification
-	mParamList.push_back(Parameter("truck_width_min", "int", "60")); // classified as truck, if larger
-	mParamList.push_back(Parameter("truck_height_min", "int", "28")); // classified as truck, if larger
-	return true;
-}
 
 bool Config::insertParam(Parameter param) {
 	mParamList.push_back(param);
 	return true;
 }
 
-bool Config::openDb(string dbFile) {
-	bool success = false;
-
-	/* set working dir, db file and config table, compose working path */
-	if (dbFile == "")
-		mDbFile = "carcounter.sqlite";
-	else mDbFile = dbFile;
-	
-	mDbTblConfig = "config";
-	mDbPath = mVideoPath;
-
-	if (!pathExists(mDbPath))
-		if (!makePath(mDbPath)) {
-			cerr << __LINE__ << " cannot create working directory" << endl;
-			cerr << GetLastError() << endl;
-			return false;
-		};
-
-	string fullPath = mDbPath + mDbFile;
-	
-	/* open db and get handle */
-	int rc = sqlite3_open(fullPath.c_str(), &mDbHandle);
-	if (rc == SQLITE_OK)
-		success = true;
-	else {
-		cerr << __LINE__ << " error opening " << mDbPath << endl;
-		cerr << __LINE__ << " " << sqlite3_errmsg(mDbHandle) << endl;
-		sqlite3_close(mDbHandle);
-		mDbHandle = NULL;
-		success = false;
-	}
-	return success;
-}
 
 bool Config::loadParams() {
+	using namespace	std;
 	bool success = false;
 	stringstream ss;
 	string sqlCreate, sqlRead, sqlinsert;
@@ -250,7 +183,150 @@ bool Config::loadParams() {
 	return success;
 }
 
-bool Config::queryDbSingle(const string& sql, string& value) {
+
+// locate video file, save full path to m_videoFilePath
+// search order: 1. current directory, 2. /home, 3. /home/work_dir
+bool Config::locateVideoFile(std::string fileName) {
+	using namespace std;
+	// TODO delete after debug
+	readEnvHome(); // set mHomePath
+	if (!mHomePath.size()) {
+		cerr << "locateVideoFile: home path not set yet" << endl;
+		return false;
+	}
+	m_videoFilePath.clear();
+
+	// 1. check current_dir
+	string currentPath;
+	#if defined (_WIN32)
+		char bufPath[_MAX_PATH];
+		_getcwd(bufPath, _MAX_PATH);
+		if (bufPath) {
+			currentPath = string(bufPath);
+		} else {
+			cerr << "locateVideoFile: error reading current directory" << endl;
+			if (GetLastError() == ERANGE)
+				cerr << "locateVideoFile: path length > _MAX_PATH" << endl;
+			return false;
+		}
+	#elif defined (__linux__)
+		char bufPath[PATH_MAX];
+		getcwd(bufPath, PATH_MAX);
+		if (bufPath) {
+			currentPath = string(bufPath);
+		} else {
+			cerr << "locateVideoFile: error reading current directory" << endl;
+			if (errno == ENAMETOOLONG)
+				cerr << "locateVideoFile: path length > PATH_MAX" << endl;
+			return false;
+		}
+	#else
+		throw "unsupported OS";
+	#endif
+	string filePath = currentPath;
+	appendDirToPath(filePath, fileName);
+	if (isFileExist(filePath)) {
+		m_videoFilePath = filePath;
+		return true;
+	}
+
+	// 2. check /home
+	filePath = mHomePath;
+	appendDirToPath(filePath, fileName);
+	if (isFileExist(filePath)) {
+		m_videoFilePath = filePath;
+		return true;
+	}
+
+	// 3. check /home/work_dir
+	filePath = m_workPath;
+	appendDirToPath(filePath, fileName);
+	if (isFileExist(filePath)) {
+		m_videoFilePath = filePath;
+		return true;
+	}
+
+	// file not found
+	return false;
+}
+
+
+bool Config::openDb(std::string dbFile) {
+	using namespace	std;
+	bool success = false;
+
+	/* set working dir, db file and config table, compose working path */
+	if (dbFile == "")
+		mDbFile = "carcounter.sqlite";
+	else mDbFile = dbFile;
+	
+	mDbTblConfig = "config";
+	mDbPath = m_workPath;
+
+	if (!pathExists(mDbPath))
+		if (!makePath(mDbPath)) {
+			cerr << __LINE__ << " cannot create working directory" << endl;
+			cerr << GetLastError() << endl;
+			return false;
+		};
+
+	string fullPath = mDbPath + mDbFile;
+	
+	/* open db and get handle */
+	int rc = sqlite3_open(fullPath.c_str(), &mDbHandle);
+	if (rc == SQLITE_OK)
+		success = true;
+	else {
+		cerr << __LINE__ << " error opening " << mDbPath << endl;
+		cerr << __LINE__ << " " << sqlite3_errmsg(mDbHandle) << endl;
+		sqlite3_close(mDbHandle);
+		mDbHandle = NULL;
+		success = false;
+	}
+	return success;
+}
+
+
+bool Config::populateStdParams() {
+	mParamList.clear();
+
+	/* TODO set standard parameters */
+	// TODO parameter for capFileName
+	// capFile, capDevice, framesize, framerate
+	mParamList.push_back(Parameter("video_file", "string", "traffic640x480.avi"));
+	mParamList.push_back(Parameter("work_path", "string", "D:/Users/Holger/count_traffic/"));
+	mParamList.push_back(Parameter("video_device", "int", "0"));
+	mParamList.push_back(Parameter("is_video_from_cam", "bool", "false"));
+	mParamList.push_back(Parameter("frame_size_id", "int", "0"));
+	mParamList.push_back(Parameter("frame_size_x", "int", "320"));
+	mParamList.push_back(Parameter("frame_size_y", "int", "240"));
+	mParamList.push_back(Parameter("frame_rate", "int", "10"));
+	// region of interest
+	mParamList.push_back(Parameter("roi_x", "int", "80"));
+	mParamList.push_back(Parameter("roi_y", "int", "80"));
+	mParamList.push_back(Parameter("roi_width", "int", "180"));
+	mParamList.push_back(Parameter("roi_height", "int", "80"));
+	// blob assignment
+	mParamList.push_back(Parameter("blob_area_min", "int", "200"));
+	mParamList.push_back(Parameter("blob_area_max", "int", "20000"));
+	// track assignment
+	mParamList.push_back(Parameter("track_max_confidence", "int", "4"));
+	mParamList.push_back(Parameter("track_max_deviation", "double", "80"));
+	mParamList.push_back(Parameter("track_max_distance", "double", "30"));
+	// scene tracker
+	mParamList.push_back(Parameter("max_n_of_tracks", "int", "9")); // maxNoIDs
+	// counting
+	mParamList.push_back(Parameter("count_confidence", "int", "3"));
+	mParamList.push_back(Parameter("count_pos_x", "int", "90")); // counting position (within roi)
+	mParamList.push_back(Parameter("count_track_length", "int", "20")); // min track length for counting
+	// classification
+	mParamList.push_back(Parameter("truck_width_min", "int", "60")); // classified as truck, if larger
+	mParamList.push_back(Parameter("truck_height_min", "int", "28")); // classified as truck, if larger
+	return true;
+}
+
+
+bool Config::queryDbSingle(const std::string& sql, std::string& value) {
 	bool success = false;
 	sqlite3_stmt *stmt;
 
@@ -306,6 +382,7 @@ bool Config::queryDbSingle(const string& sql, string& value) {
 // TODO only perform lexical checks in this function
 //	physical test, e.g. file existence will be checked 
 bool Config::readCmdLine(ProgramOptions programOptions) {
+	using namespace	std;
 	// arguments
 	//  i(nput): cam (single digit number) or file name,
 	//		if empty take standard cam
@@ -392,8 +469,8 @@ bool Config::readCmdLine(ProgramOptions programOptions) {
 
 	//  w: working directory, below $home
 	if (programOptions.exists('w')) {
-		string videoPath = appendDirToPath(mHomePath, programOptions.getOptArg('w'));
-		setParam("video_path", videoPath);
+		string workPath = appendDirToPath(mHomePath, programOptions.getOptArg('w'));
+		setParam("work_path", workPath);
 	} // end if (programOptions.exists('w'))
 
 	return true;
@@ -401,6 +478,7 @@ bool Config::readCmdLine(ProgramOptions programOptions) {
 
 
 std::string Config::readEnvHome() {
+	using namespace	std;
 	mHomePath.clear();
 
 	#if defined (_WIN32)
@@ -430,7 +508,7 @@ std::string Config::readEnvHome() {
 }
 
 
-bool Config::setParam(string name, string value) {
+bool Config::setParam(std::string name, std::string value) {
 	list<Parameter>::iterator iParam = find_if(mParamList.begin(), mParamList.end(),
 		ParamEquals(name));
 	if (iParam == mParamList.end())
@@ -441,8 +519,26 @@ bool Config::setParam(string name, string value) {
 
 
 // Directory manipulation functions
-string getHome() {
-	string home;
+std::string& appendDirToPath(std::string& path, const std::string& dir) {
+	#if defined (_WIN32)
+		char delim = '\\';
+	#elif defined (__linux__)
+		char delim = '/';
+	#else
+		throw "unsupported OS";
+	#endif
+	
+	// append delimiter, if missing 
+	if (path.back() != delim && dir.front() != delim)
+		path += delim;
+	path += dir;
+
+	return path;
+}
+
+
+std::string getHome() {
+	std::string home;
 	#if defined (_WIN32)
 		char *pHomeDrive, *pHomePath;
 		pHomeDrive = getenv("HOMEDRIVE");
@@ -450,7 +546,7 @@ string getHome() {
 			home += pHomeDrive;
 		pHomePath = getenv("HOMEPATH");
 		if (pHomePath !=0)
-			home = appendDirToPath(home, string(pHomePath));
+			home = appendDirToPath(home, std::string(pHomePath));
 	#elif defined (__linux__)
 		char *pHome;
 		pHomePath = getenv("HOME");
@@ -460,27 +556,16 @@ string getHome() {
 			home += '/';
 		}
 	#else
-		throw 1;
+		throw "unsupported OS";
 	#endif
 	
 	return home;
 }
 
-string& appendDirToPath(string& path, string& dir) {
-	path += dir;
-	#if defined (_WIN32)
-			path += '\\';
-	#elif defined (__linux__)
-			path += '/';
-	#else
-		throw 1;
-	#endif
-	return path;
-}
 
-bool pathExists(string& path) {
+bool pathExists(const std::string& path) {
 	#if defined (_WIN32)
-		wstring wPath;
+		std::wstring wPath;
 		wPath.assign(path.begin(), path.end());
 
 		DWORD fileAttrib = GetFileAttributes(wPath.c_str());
@@ -501,9 +586,9 @@ bool pathExists(string& path) {
 	#endif
 }
 
-bool makeDir(string& dir) {
+bool makeDir(const std::string& dir) {
 	#if defined (_WIN32)
-		wstring wDir;
+		std::wstring wDir;
 		wDir.assign(dir.begin(), dir.end());
 
 		if (CreateDirectory(wDir.c_str(), 0))
@@ -521,7 +606,9 @@ bool makeDir(string& dir) {
 	#endif
 }
 
-bool makePath(string& path) {
+
+// make full path
+bool makePath(std::string path) {
 	#if defined (_WIN32)
 		char delim = '\\';
 	#elif defined (__linux__)
@@ -537,7 +624,7 @@ bool makePath(string& path) {
 		path += delim;
 
 	pos = path.find_first_of(delim);
-	while (success == true && pos != string::npos)
+	while (success == true && pos != std::string::npos)
 	{
 		if (pos != 0)
 			success = makeDir(path.substr(0, pos));
@@ -547,10 +634,9 @@ bool makePath(string& path) {
 	return success;
 }
 
-// TODO declare in header
-// test
-bool isFileExist(string& path) {
-	if (_access(path.c_str(), 0))
+
+bool isFileExist(const std::string& path) {
+	if (_access(path.c_str(), 0) == 0)
 		return true;
 	else
 		return false;
@@ -558,15 +644,15 @@ bool isFileExist(string& path) {
 
 
 // String conversion functions
-bool isInteger(const string& str) {
-	string::const_iterator iString = str.begin();
+bool isInteger(const std::string& str) {
+	std::string::const_iterator iString = str.begin();
 	while (iString != str.end() && isdigit(*iString))
 		++iString;
 	return !str.empty() && iString == str.end();
 }
 
 
-bool stob(string str) {
+bool stob(std::string str) {
 	transform(str.begin(), str.end(), str.begin(), ::tolower);
 	if (str == "true")
 		return true;

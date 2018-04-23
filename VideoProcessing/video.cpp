@@ -23,6 +23,14 @@ int main(int argc, char* argv[]) {
 
 	// capSource must be open in order to set frame size
 	bool succ = frameHandler.openCapSource(false);
+	
+	// recalcFrameSizeDependentParams, if different frame size
+	int widthNew = static_cast<int>frameHandler.getFrameSize().width;
+	int heightNew = static_cast<int>frameHandler.getFrameSize().height;
+	int widthActual = stoi(config.getParam("frame_size_x"));
+	int heightActual = stoi(config.getParam("frame_size_y"));
+	if ( widthNew != widthActual || heightNew != heightActual ) 
+		 config.adjustFrameSizeDependentParams(widthNew, heightNew);
 
 
 	SceneTracker scene(pConfig); // collection of tracks and vehicles with MOG2
@@ -45,7 +53,7 @@ int main(int argc, char* argv[]) {
 	 *	return -1;
 	 */
 
-
+	config.locateVideoFile("traffic.avi");
 	
 
 	while(true)
