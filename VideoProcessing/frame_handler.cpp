@@ -15,7 +15,7 @@ FrameHandler::FrameHandler(Config* pConfig) : Observer(pConfig), mMog2(100, 25, 
 	int iDevices = m_winCapture->enumerateDevices();
 
 	// load inset image to display counting results on
-	string inset_path = pConfig->getParam("work_path");
+	string inset_path = pConfig->getParam("application_path");
 	inset_path += "inset3.png";
 	cv::Mat inset_org = cv::imread(inset_path);
 	if (!inset_org.data)
@@ -199,9 +199,9 @@ void FrameHandler::showFrame(std::list<Track>& tracks, CountResults cr) {
 }
 
 void FrameHandler::update() {
-	mCapSource.deviceName = stoi(mSubject->getParam("video_device"));
-	mCapSource.fileName = mSubject->getParam("video_file");
-	mCapSource.path = mSubject->getParam("work_path");
+	mCapSource.deviceName = stoi(mSubject->getParam("cam_device_ID"));
+	mCapSource.fileName = mSubject->getParam("video_file"); // TODO Delete
+	mCapSource.path = mSubject->getParam("application_path");
 	mFramesize.x = stoi(mSubject->getParam("frame_size_x"));
 	mFramesize.y = stoi(mSubject->getParam("frame_size_y"));
 	// region of interest

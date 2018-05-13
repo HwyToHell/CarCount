@@ -16,54 +16,54 @@ public:
 	bool setValue(std::string& value);
 };
 
+/// config: hold application parameters, command line parsing,
+/// read from / write to sqlite config file,
+/// automatic update of subscribed observers
 class Config : public Subject {
-private:
-	// i(nput):				video device or file name
-	// r(ate):				fps for video device
-	// v(ideo size):		frame size in px (width x height)
-	// w(orking directory): working dir, starting in $home
-
-	sqlite3*				mDbHandle;
-	std::string				mDbFile;
-	std::string				mDbPath;
-	std::string				mDbTblConfig;
-	std::string				mDbTblData; // table for time series
-	std::string				mHomePath;
-	std::list<Parameter>	mParamList;
-	std::string				m_workPath; // TODO delete?
-	std::string				m_videoFilePath;
-
-	// TODO 
-	// loadParam("all" - load all, "name" - load only param 'name')
-	bool					loadParams(); // TODO move logic to readEnv()	
-	bool					openDb(std::string dbFile);
-	bool					queryDbSingle(const std::string& sql, std::string& value);
-	std::string				readEnvHome();
-	bool					saveParams(); // TODO move logic to readEnv()
-
 public:
-	Config(std::string dbFileName = "");
-	// TODO constructor for test cases, without reading config file
-	// Config();
+	Config();
 	~Config();
 	void		adjustFrameSizeDependentParams(int new_size_x, int new_size_y); // TODO implementation
 	std::string getParam(std::string name);
-	bool		init(); // TODO move logic to readEnv()	
 	bool		insertParam(Parameter param);
 	bool		locateVideoFile(std::string fileName);
-	bool		populateStdParams();
 	bool		readCmdLine(ProgramOptions po);
-	bool		readConfigFile(); // TODO implementation
-	bool		saveConfigToFile; // TODO implementation
+	bool		readConfigFile(std::string configFile); 
+	bool		saveConfigToFile(); // TODO implementation
 	bool		setParam(std::string name, std::string value);
+
+private:
+	std::string				m_appPath;
+	std::string				m_configFilePath;
+	std::string				m_configTableName;
+	sqlite3*				m_dbHandle;
+	std::string				m_homePath;
+	bool					m_quiet;
+	std::list<Parameter>	m_paramList;
+	std::string				m_videoFilePath;
+
+	// init: set path to application and con-fig file,
+	// create parameter list (with std values)
+	bool					init(); 
+	bool					loadParamsFromDb();
+	bool					populateStdParams();
+	bool					queryDbSingle(const std::string& sql, std::string& value);
+	bool					saveParams(); // TODO move logic to readEnv()
+	bool					setAppPath(std::string appDir = "counter");
+	void					setConfigProps(	std::string configDirPath, 
+											std::string configFileName = "config.sqlite",
+											std::string configTable = "config");
+
 };
 
 
+// Helper
+void printCommandOptions();
+
 // Directory manipulation functions
-std::string		getHome();
+std::string		getHomePath();
 std::string&	appendDirToPath(std::string& path, const std::string& dir);
 bool			isFileExist(const std::string& path);
-bool			pathExists(const std::string& path); // TODO delete, us isFileExist instead
 bool			makeDir(const std::string& dir);
 bool			makePath(std::string path);
 

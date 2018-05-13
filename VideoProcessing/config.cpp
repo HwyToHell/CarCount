@@ -39,28 +39,21 @@ public:
 // Config ////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-Config::Config(std::string dbFileName)  : mDbFile(dbFileName) {
-
-	// TODO clear set-up of db open and close
-	bool success = populateStdParams();
-	m_workPath = getParam("work_path");
-
-	if (dbFileName != "") {
-		success = openDb(dbFileName);
-		if (!success)
-			cerr << __LINE__ << " error initializing config instance" << endl;
-	}
-	else {
-		cerr << "no config file" << endl;
-		mDbHandle = nullptr;
-	}
+Config::Config() :	m_appPath(std::string()),
+					m_configFilePath(std::string()),
+					m_configTableName(std::string()),
+					m_dbHandle(nullptr),
+					m_quiet(false),
+					m_paramList(std::list<Parameter>()),
+					m_videoFilePath(std::string()) {
+	init();
 }
 
 Config::~Config() {
-	if (mDbHandle) {
-		int rc = sqlite3_close(mDbHandle);
+	if (m_dbHandle) {
+		int rc = sqlite3_close(m_dbHandle);
 		if (rc != SQLITE_OK)
-			cerr << __LINE__ << " data base was not closed correctly" << endl;
+			cerr << "Config destructor: data base was not closed correctly" << endl;
 	}
 }
 
@@ -119,9 +112,9 @@ void Config::adjustFrameSizeDependentParams(int new_size_x, int new_size_y) {
 
 std::string Config::getParam(std::string name) {
 	using namespace	std;
-	list<Parameter>::iterator iParam = find_if(mParamList.begin(), mParamList.end(), ParamEquals(name));
-	if (iParam == mParamList.end()) {
-		cerr << "parameter not in config: " << name <<endl;
+	list<Parameter>::iterator iParam = find_if(m_paramList.begin(), m_paramList.end(), ParamEquals(name));
+	if (iParam == m_paramList.end()) {
+		cerr << "getParam: parameter not in config: " << name <<endl;
 		return string("");
 	}
 	else {
@@ -130,21 +123,50 @@ std::string Config::getParam(std::string name) {
 }
 
 bool Config::init() {
-	return loadParams();
-	///TODO move working path logic to here
-	/// store workingPath for db and video files in ParamList
+	using namespace std;
+	// create parameter list with standard values
+	// must be done before setAppPath, as m_appPath is saved in parameter list
+	if (!populateStdParams()) {
+		cerr << "init: cannot create parameter list" << endl;
+		return false;
+	}
 
-}
+	// set application path underneath /home
+	if (!setAppPath("counter")) {
+		cerr << "init: cannot create application path" << endl;
+		return false;
+	}
 
-
-bool Config::insertParam(Parameter param) {
-	mParamList.push_back(param);
+	// set path to config file and table name
+	setConfigProps(m_appPath, "config");
+		
 	return true;
 }
 
 
-bool Config::loadParams() {
+bool Config::insertParam(Parameter param) {
+	m_paramList.push_back(param);
+	return true;
+}
+
+
+bool Config::loadParamsFromDb() {
 	using namespace	std;
+	
+	// check valid object state
+	if (!m_dbHandle) {
+		cerr << "loadParamsFromDb: data base not open yet" << endl;
+		return false;
+	}
+	if (m_paramList.empty()) {
+		cerr << "loadParamsFromDb: parameter list not initialized yet" << endl;
+		return false;
+	}
+	if (m_configTableName.empty()) {
+		cerr << "loadParamsFromDb: db table not specified" << endl;
+		return false;
+	}
+
 	bool success = false;
 	stringstream ss;
 	string sqlCreate, sqlRead, sqlinsert;
@@ -152,17 +174,17 @@ bool Config::loadParams() {
 	
 	// check, if table exists
 	ss.str("");
-	ss << "create table if not exists " << mDbTblConfig << " (name text, type text, value text);";
+	ss << "create table if not exists " << m_configTableName << " (name text, type text, value text);";
 	sqlCreate = ss.str();
 	success = queryDbSingle(sqlCreate, noRet);
 
 
-	list<Parameter>::iterator iParam = mParamList.begin();
-	while (iParam != mParamList.end())
+	list<Parameter>::iterator iParam = m_paramList.begin();
+	while (iParam != m_paramList.end())
 	{
 		// read parameter
 		ss.str("");
-		ss << "select value from " << mDbTblConfig << " where name=" << "'" << iParam->getName() << "';"; 
+		ss << "select value from " << m_configTableName << " where name=" << "'" << iParam->getName() << "';"; 
 		sqlRead = ss.str();
 		string strValue;
 		success = queryDbSingle(sqlRead, strValue);
@@ -172,7 +194,7 @@ bool Config::loadParams() {
 		else // use standard parameter value and insert new record into db
 		{
 			ss.str("");
-			ss << "insert into " << mDbTblConfig << " values ('" << iParam->getName() << "', '" << iParam->getType() << "', '" << iParam->getValue() << "');";
+			ss << "insert into " << m_configTableName << " values ('" << iParam->getName() << "', '" << iParam->getType() << "', '" << iParam->getValue() << "');";
 			sqlinsert = ss.str();
 			strValue = iParam->getValue();
 			success =  queryDbSingle(sqlinsert, noRet);
@@ -188,9 +210,8 @@ bool Config::loadParams() {
 // search order: 1. current directory, 2. /home, 3. /home/work_dir
 bool Config::locateVideoFile(std::string fileName) {
 	using namespace std;
-	// TODO delete after debug
-	readEnvHome(); // set mHomePath
-	if (!mHomePath.size()) {
+
+	if (m_homePath.empty()) {
 		cerr << "locateVideoFile: home path not set yet" << endl;
 		return false;
 	}
@@ -231,15 +252,15 @@ bool Config::locateVideoFile(std::string fileName) {
 	}
 
 	// 2. check /home
-	filePath = mHomePath;
+	filePath = m_homePath;
 	appendDirToPath(filePath, fileName);
 	if (isFileExist(filePath)) {
 		m_videoFilePath = filePath;
 		return true;
 	}
 
-	// 3. check /home/work_dir
-	filePath = m_workPath;
+	// 3. check /home/app_dir
+	filePath = m_appPath;
 	appendDirToPath(filePath, fileName);
 	if (isFileExist(filePath)) {
 		m_videoFilePath = filePath;
@@ -251,77 +272,43 @@ bool Config::locateVideoFile(std::string fileName) {
 }
 
 
-bool Config::openDb(std::string dbFile) {
-	using namespace	std;
-	bool success = false;
-
-	/* set working dir, db file and config table, compose working path */
-	if (dbFile == "")
-		mDbFile = "carcounter.sqlite";
-	else mDbFile = dbFile;
-	
-	mDbTblConfig = "config";
-	mDbPath = m_workPath;
-
-	if (!pathExists(mDbPath))
-		if (!makePath(mDbPath)) {
-			cerr << __LINE__ << " cannot create working directory" << endl;
-			cerr << GetLastError() << endl;
-			return false;
-		};
-
-	string fullPath = mDbPath + mDbFile;
-	
-	/* open db and get handle */
-	int rc = sqlite3_open(fullPath.c_str(), &mDbHandle);
-	if (rc == SQLITE_OK)
-		success = true;
-	else {
-		cerr << __LINE__ << " error opening " << mDbPath << endl;
-		cerr << __LINE__ << " " << sqlite3_errmsg(mDbHandle) << endl;
-		sqlite3_close(mDbHandle);
-		mDbHandle = NULL;
-		success = false;
-	}
-	return success;
-}
-
-
 bool Config::populateStdParams() {
-	mParamList.clear();
+	m_paramList.clear();
 
 	/* TODO set standard parameters */
 	// TODO parameter for capFileName
 	// capFile, capDevice, framesize, framerate
-	mParamList.push_back(Parameter("video_file", "string", "traffic640x480.avi"));
-	mParamList.push_back(Parameter("work_path", "string", "D:/Users/Holger/count_traffic/"));
-	mParamList.push_back(Parameter("video_device", "int", "0"));
-	mParamList.push_back(Parameter("is_video_from_cam", "bool", "false"));
-	mParamList.push_back(Parameter("frame_size_id", "int", "0"));
-	mParamList.push_back(Parameter("frame_size_x", "int", "320"));
-	mParamList.push_back(Parameter("frame_size_y", "int", "240"));
-	mParamList.push_back(Parameter("frame_rate", "int", "10"));
+	m_paramList.push_back(Parameter("application_path", "string", "D:\\Users\\Holger"));
+	m_paramList.push_back(Parameter("video_file_path", "string", "D:\\Users\\Holger\\counter\\traffic640x480.avi"));
+	m_paramList.push_back(Parameter("is_video_from_cam", "bool", "false"));
+
+	m_paramList.push_back(Parameter("cam_device_ID", "int", "0"));
+	m_paramList.push_back(Parameter("cam_resolution_ID", "int", "0"));
+	m_paramList.push_back(Parameter("cam_fps", "int", "10"));
+
+	m_paramList.push_back(Parameter("frame_size_x", "int", "320"));
+	m_paramList.push_back(Parameter("frame_size_y", "int", "240"));
 	// region of interest
-	mParamList.push_back(Parameter("roi_x", "int", "80"));
-	mParamList.push_back(Parameter("roi_y", "int", "80"));
-	mParamList.push_back(Parameter("roi_width", "int", "180"));
-	mParamList.push_back(Parameter("roi_height", "int", "80"));
+	m_paramList.push_back(Parameter("roi_x", "int", "80"));
+	m_paramList.push_back(Parameter("roi_y", "int", "80"));
+	m_paramList.push_back(Parameter("roi_width", "int", "180"));
+	m_paramList.push_back(Parameter("roi_height", "int", "80"));
 	// blob assignment
-	mParamList.push_back(Parameter("blob_area_min", "int", "200"));
-	mParamList.push_back(Parameter("blob_area_max", "int", "20000"));
+	m_paramList.push_back(Parameter("blob_area_min", "int", "200"));
+	m_paramList.push_back(Parameter("blob_area_max", "int", "20000"));
 	// track assignment
-	mParamList.push_back(Parameter("track_max_confidence", "int", "4"));
-	mParamList.push_back(Parameter("track_max_deviation", "double", "80"));
-	mParamList.push_back(Parameter("track_max_distance", "double", "30"));
+	m_paramList.push_back(Parameter("track_max_confidence", "int", "4"));
+	m_paramList.push_back(Parameter("track_max_deviation", "double", "80"));
+	m_paramList.push_back(Parameter("track_max_distance", "double", "30"));
 	// scene tracker
-	mParamList.push_back(Parameter("max_n_of_tracks", "int", "9")); // maxNoIDs
+	m_paramList.push_back(Parameter("max_n_of_tracks", "int", "9")); // maxNoIDs
 	// counting
-	mParamList.push_back(Parameter("count_confidence", "int", "3"));
-	mParamList.push_back(Parameter("count_pos_x", "int", "90")); // counting position (within roi)
-	mParamList.push_back(Parameter("count_track_length", "int", "20")); // min track length for counting
+	m_paramList.push_back(Parameter("count_confidence", "int", "3"));
+	m_paramList.push_back(Parameter("count_pos_x", "int", "90")); // counting position (within roi)
+	m_paramList.push_back(Parameter("count_track_length", "int", "20")); // min track length for counting
 	// classification
-	mParamList.push_back(Parameter("truck_width_min", "int", "60")); // classified as truck, if larger
-	mParamList.push_back(Parameter("truck_height_min", "int", "28")); // classified as truck, if larger
+	m_paramList.push_back(Parameter("truck_width_min", "int", "60")); // classified as truck, if larger
+	m_paramList.push_back(Parameter("truck_height_min", "int", "28")); // classified as truck, if larger
 	return true;
 }
 
@@ -330,7 +317,7 @@ bool Config::queryDbSingle(const std::string& sql, std::string& value) {
 	bool success = false;
 	sqlite3_stmt *stmt;
 
-	int rc = sqlite3_prepare_v2(mDbHandle, sql.c_str(), -1, &stmt, 0);
+	int rc = sqlite3_prepare_v2(m_dbHandle, sql.c_str(), -1, &stmt, 0);
 	if (rc == SQLITE_OK)
 	{
 		int step = SQLITE_ERROR;
@@ -371,7 +358,7 @@ bool Config::queryDbSingle(const std::string& sql, std::string& value) {
 
 	else // sqlite3_prepare != OK
 	{
-		cerr << "SQL error: " << sqlite3_errmsg(mDbHandle) << endl;
+		cerr << "SQL error: " << sqlite3_errmsg(m_dbHandle) << endl;
 		rc = sqlite3_finalize(stmt);
 		success = false;
 	}
@@ -379,22 +366,19 @@ bool Config::queryDbSingle(const std::string& sql, std::string& value) {
 }
 
 
-// TODO only perform lexical checks in this function
-//	physical test, e.g. file existence will be checked 
+// command line arguments
+//  i(nput):		cam ID (single digit number) or file name,
+//					if empty take standard cam
+//  q(uiet)			quiet mode (take standard arguments from config file
+//  r(ate):			cam fps
+//  v(ideo size):	cam resolution ID (single digit number)
+// only lexical checks are performed in this function
+// physical test are done in other submodules, e.g. file existence will be checked 
 bool Config::readCmdLine(ProgramOptions programOptions) {
 	using namespace	std;
-	// arguments
-	//  i(nput): cam (single digit number) or file name,
-	//		if empty take standard cam
-	//  r(ate):	fps for video device
-	//  v(ideo size): frame size in px (width x height)
-	//  w(orking directory): working dir, below $home
+	bool isVideoSourceValid = false;
 
-	// TODO perform check after workdir has been checked
-	//  look for input file in
-	//		- current directory
-	//		- workdir
-
+	// 1 lexical checks, argument by argument
 	// i: video input from cam or file
 	if (programOptions.exists('i')) { 
 		string videoInput = programOptions.getOptArg('i');
@@ -407,8 +391,9 @@ bool Config::readCmdLine(ProgramOptions programOptions) {
 			string camID = videoInput.substr(0, 1);
 			
 			if (isdigit(camID.at(0))) { // cam ID must be int digit
-				setParam("video_device", camID);
+				setParam("cam_device_ID", camID);
 				setParam("is_video_from_cam", "true");
+				isVideoSourceValid = true;
 			}
 			else {
 				cerr << "invalid argument: camera ID option '-i " << camID << "'" << endl;
@@ -421,14 +406,22 @@ bool Config::readCmdLine(ProgramOptions programOptions) {
 		else { // video file name
 			setParam("video_file", videoInput);
 			setParam("is_video_from_cam", "false");
+			isVideoSourceValid = true;
 		}
 	} // end if (programOptions.exists('i'))
+
+	//  q: quiet mode = take standard arguments, don't query for user input
+	if (programOptions.exists('q')) {
+		m_quiet = true;
+	} else { 
+		m_quiet = false;
+	}
 
 	// r: frame rate in fps
 	if (programOptions.exists('r')) {
 		string frameRate = programOptions.getOptArg('r');
 		if (isInteger(frameRate)) {
-			setParam("frame_rate", frameRate);
+			setParam("cam_fps", frameRate);
 		}
 		else {
 			cerr << "invalid argument: frame rate option '-r " << frameRate << "'" << endl;
@@ -437,81 +430,169 @@ bool Config::readCmdLine(ProgramOptions programOptions) {
 		}
 	} // end if (programOptions.exists('r'))
 
+	// TODO change lexical check for single digit
 	// v: video size
 	if (programOptions.exists('v')) {
-		string videoSize = programOptions.getOptArg('v');
-		string delimiter = "x";
-
-		size_t firstPos = 0;
-		size_t nextPos = videoSize.find_first_of(delimiter, firstPos);
-		string framesize_x = videoSize.substr(firstPos, nextPos);
-
-		if (isInteger(framesize_x))
-			setParam("frame_size_x", framesize_x);
-		else {
-			cerr << "invalid argument: video size option '-v " << videoSize << "'" << endl;
-			cerr << "video width must be integer" << endl;
-			return false;
+		string resolutionID = programOptions.getOptArg('v');
+		// check if single digit
+		// check if file exists -> error message
+		if (resolutionID.size() == 1)  { // OK, must be one digit
+			if (isdigit(resolutionID.at(0))) { // OK, must be int digit 
+				setParam("cam_resolution_ID", resolutionID);
+			} else {
+				cerr << "invalid argument: resolution ID option '-v " << resolutionID << "'" << endl;
+				cerr << "resolution ID must be integer within range 0 ... 9" << endl;
+				return false;
+			}
+		} else {
+				cerr << "invalid argument: resolution ID option '-v " << resolutionID << "'" << endl;
+				cerr << "resolution ID must be integer within range 0 ... 9" << endl;
+				return false;
 		}
-
-		firstPos = nextPos + 1;
-		nextPos = videoSize.find_first_of(delimiter, firstPos);
-		string framesize_y = videoSize.substr(firstPos, nextPos);
-
-		if (isInteger(framesize_y))
-			setParam("frame_size_y", framesize_y);
-		else {
-			cerr << "invalid argument: video size option '-v " << videoSize << "'" << endl;
-			cerr << "video height must be integer" << endl;
-			return false;
-		}
+		return true;
 	} // end if (programOptions.exists('v'))
 
-	//  w: working directory, below $home
-	if (programOptions.exists('w')) {
-		string workPath = appendDirToPath(mHomePath, programOptions.getOptArg('w'));
-		setParam("work_path", workPath);
-	} // end if (programOptions.exists('w'))
+	// not quiet, no input specified -> printHelp, exit
+	if (!isVideoSourceValid && !m_quiet) {
+		printCommandOptions();
+		return false;
+	}
+	
+	// 2 save config
+	// TODO implementation
+
 
 	return true;
 }
 
+// config file must reside in m_appPath
+bool Config::readConfigFile(std::string configFile) {
+	using namespace std;
 
-std::string Config::readEnvHome() {
-	using namespace	std;
-	mHomePath.clear();
+	if (configFile.empty()) {
+		cerr << "readConfigFile: no filename specified" << endl;
+		return false;
+	}
 
-	#if defined (_WIN32)
-		char *pHomeDrive, *pHomePath;
-		pHomeDrive = getenv("HOMEDRIVE");
-		if (pHomeDrive != nullptr)
-			mHomePath += pHomeDrive;
-		else {
-			cerr << __FILE__ << __LINE__ << 
-				" no home drive set in env" << endl;
-			return mHomePath;
+	// db already open?
+	if (!m_dbHandle) {
+		int rc = sqlite3_open(configFile.c_str(), &m_dbHandle);
+		if (rc != SQLITE_OK) {
+			cerr << "readConfigFile: error opening " << configFile << endl;
+			cerr << "message: " << sqlite3_errmsg(m_dbHandle) << endl;
+			sqlite3_close(m_dbHandle);
+			m_dbHandle = nullptr;
+			return false;
 		}
-		pHomePath = getenv("HOMEPATH");
-		appendDirToPath(mHomePath, string(pHomePath));
-	#elif defined (__linux__)
-		char *pHomePath;
-		pHomePath = getenv("HOME");
-		if (pHome != nullptr)	{
-			home += pHome;
-			home += '/';
-		}
-	#else
-		throw 1;
-	#endif
+	}
 
-	return mHomePath;
+	// read all parameters from config db file
+	if (loadParamsFromDb())
+		return true;
+	else
+		return false;
+}
+
+
+bool Config::saveConfigToFile() {
+	using namespace std;
+	// validate object state
+	if (!m_dbHandle) {
+		cerr << "saveConfigToFile: data base not open yet" << endl;
+		return false;
+	}
+	if (m_configTableName.empty()) {
+		cerr << "saveConfigToFile: db table not specified" << endl;
+		return false;
+	}
+
+	// create table, if not exist
+	stringstream ss;
+	ss << "create table if not exists " << m_configTableName << " (name text, type text, value text);";
+	string sqlStmt = ss.str();
+	string answer;
+	if (!queryDbSingle(sqlStmt, answer)) {
+		cerr << "saveConfigToFile: db table does not exist, cannot create it" << endl;
+		return false;
+	}
+
+	// TODO check, if parameter exists in db
+	// if it does not exist -> insert
+	// otherwise            -> update
+
+	// read all parameters and insert into db
+	bool success = false;
+	list<Parameter>::iterator iParam = m_paramList.begin();
+	while (iParam != m_paramList.end())	{
+		ss.str("");
+		ss << "select 1 from " << m_configTableName << "where name='" << iParam->getName() << "';";
+		string sqlStmt = ss.str();
+		success = queryDbSingle(sqlStmt, answer);
+
+		// check, if parameter row exists in db
+		ss.str("");
+		if (stob(answer)) {// row does exist -> update
+			ss << "update " << m_configTableName << " set value='" << iParam->getValue() << "' " 
+				<< "where name='" << iParam->getName() << "';"; 
+		} else { // row does not exist -> insert
+			ss << "insert into " << m_configTableName << " values ('" << iParam->getName() << 
+				"', '" << iParam->getType() << "', '" << iParam->getValue() << "');";
+		}
+		sqlStmt = ss.str();
+		success = queryDbSingle(sqlStmt, answer);
+	}
+
+	return success;
+}
+
+
+
+// set path to application directory 
+// create, if it does not exist
+bool Config::setAppPath(std::string appDir) {
+	using namespace std;
+	m_appPath = m_homePath = getHomePath();
+	
+	if (m_homePath.empty()) {
+		cerr << "setAppPath: no home path set" << endl;
+		return false;
+	} 
+	
+	// set app path and save in parameter list
+	appendDirToPath(m_appPath, appDir);
+	if (!setParam("application_path", m_appPath)) {
+		cerr << "setAppPath: cannot save application path in parameter list" << endl;
+		return false;
+	}
+
+	// if appPath does not exist, create it
+	if (!isFileExist(m_appPath)) {
+		if (!makePath(m_appPath)) {
+			cerr << "setAppPath: cannot create path: " << m_appPath << endl;
+			return false;
+		}
+	}
+
+	return true;
+}	
+
+// set path to config file and table name within config database
+void Config::setConfigProps(std::string configDirPath, std::string configFileName, std::string configTable) {
+	// set name and location of config file
+	// note: existence of config file is checked in readConfigFile()
+	m_configFilePath = configDirPath;
+	appendDirToPath(m_configFilePath, configFileName);
+
+	// table name for config data
+	m_configTableName = configTable;
+	return;
 }
 
 
 bool Config::setParam(std::string name, std::string value) {
-	list<Parameter>::iterator iParam = find_if(mParamList.begin(), mParamList.end(),
+	list<Parameter>::iterator iParam = find_if(m_paramList.begin(), m_paramList.end(),
 		ParamEquals(name));
-	if (iParam == mParamList.end())
+	if (iParam == m_paramList.end())
 		return false;
 	iParam->setValue(value);
 	return true;
@@ -537,21 +618,35 @@ std::string& appendDirToPath(std::string& path, const std::string& dir) {
 }
 
 
-std::string getHome() {
-	std::string home;
+std::string getHomePath() {
+	using namespace	std;
+	std::string home(std::string(""));
+	
 	#if defined (_WIN32)
-		char *pHomeDrive, *pHomePath;
+		char *pHomeDrive = nullptr, *pHomePath = nullptr;
 		pHomeDrive = getenv("HOMEDRIVE");
-		if (pHomeDrive != 0)
+		if (pHomeDrive == nullptr) {
+			cerr << "getHomePath: no home drive set in $env" << endl;
+			std::string("");
+		} else {
 			home += pHomeDrive;
+		}
+		
 		pHomePath = getenv("HOMEPATH");
-		if (pHomePath !=0)
+		if (pHomePath == nullptr) {
+			cerr << "getHomePath: no home path set in $env" << endl;
+			return std::string("");
+		} else {
 			home = appendDirToPath(home, std::string(pHomePath));
+		}
+
 	#elif defined (__linux__)
-		char *pHome;
+		char *pHome = nullptr;
 		pHomePath = getenv("HOME");
-		if (pHome !=0)
-		{
+		if (pHome ==0) {
+			cerr << "getHomePath: no home path set in $env" << endl;
+			return std::string("");
+		} else {
 			home += pHome;
 			home += '/';
 		}
@@ -562,29 +657,6 @@ std::string getHome() {
 	return home;
 }
 
-
-bool pathExists(const std::string& path) {
-	#if defined (_WIN32)
-		std::wstring wPath;
-		wPath.assign(path.begin(), path.end());
-
-		DWORD fileAttrib = GetFileAttributes(wPath.c_str());
-		if (fileAttrib == INVALID_FILE_ATTRIBUTES)
-		{
-			DWORD lastError = GetLastError();
-			if (lastError != ERROR_FILE_NOT_FOUND && lastError != ERROR_PATH_NOT_FOUND)
-				throw "file access error";
-			return false;
-		}
-		else
-			return true;
-	#elif defined (__linux__)
-		// TODO use stat from <sys/stat.h>
-		throw "linux";
-	#else
-		throw "unsupported OS";
-	#endif
-}
 
 bool makeDir(const std::string& dir) {
 	#if defined (_WIN32)
@@ -636,10 +708,21 @@ bool makePath(std::string path) {
 
 
 bool isFileExist(const std::string& path) {
-	if (_access(path.c_str(), 0) == 0)
+	#if defined (_WIN32)
+	if (_access(path.c_str(), 0) == 0) {
 		return true;
-	else
+	} else {
 		return false;
+		// errno: EACCES == acess denied
+		//        ENOENT == file name or path not found
+		//        EINVAL == invalid parameter
+	}
+	#elif defined (__linux__)
+		// TODO use stat from <sys/stat.h>
+		throw "linux";
+	#else
+		throw "unsupported OS";
+	#endif
 }
 
 
@@ -660,4 +743,24 @@ bool stob(std::string str) {
 		return false;
 	else
 		throw "bad bool string";
+}
+
+// command line arguments
+//  i(nput):		cam ID (single digit number) or file name,
+//					if empty take standard cam
+//  q(uiet)			quiet mode (take standard arguments from config file
+//  r(ate):			cam fps
+//  v(ideo size):	cam resolution ID (single digit number)
+void printCommandOptions() {
+	using namespace std;
+	cout << "usage: video [options]" << endl;
+	cout << endl;
+	cout << "options:" << endl;
+	cout << "-i                 specify video input, either" << endl;
+	cout << "-i cam_ID            camera -or-" << endl;
+	cout << "-i file              file" << endl;
+	cout << "-q                 quiet mode (yes to all questions)" << endl;
+	cout << "-r fps             set camera frame rate" << endl;
+	cout << "-v resolution_ID   set camera resolution ID" << endl; 
+	return;
 }

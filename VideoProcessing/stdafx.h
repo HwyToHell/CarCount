@@ -4,17 +4,19 @@
 //
 
 #pragma once
-#include <windows.h>
+
 #include <assert.h>		// for vibe
-#include <conio.h>
-#include <direct.h>		// for _mkdir
-#include <time.h>		// for vibe
 #include <cmath>
+#include <conio.h>
 #include <ctime>
+#include <direct.h>		// for _mkdir, _getcwd
 #include <iomanip>
 #include <iostream>
 #include <list>
 #include <string>
+#include <time.h>		// for vibe
+#include <windows.h>
+
 #include <opencv2/opencv.hpp>
 #include <sqlite3.h>
 

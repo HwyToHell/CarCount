@@ -12,21 +12,31 @@ using namespace std;
 int main(int argc, char* argv[]) {
 	// TODO define region of interest --> TODO: select graphical -or- detect by optical flow
 	
-	ProgramOptions cmdLineOpts(argc, argv, "i:r:v:w:");
-	// Config config(ProgramOptions(argc, argv, "i:r:v:w:"), "video.sqlite")
-	Config config("video.sqlite");
+	// command line arguments
+	//  i(nput):		cam ID (single digit number) or file name,
+	//					if empty take standard cam
+	//  q(uiet)			quiet mode (take standard arguments from config file
+	//  r(ate):			cam fps
+	//  v(ideo size):	cam resolution ID (single digit number)
+
+	ProgramOptions cmdLineOpts(argc, argv, "i:qr:v:");
+	Config config;
 	Config* pConfig = &config;
+
+	bool succ = config.readCmdLine(cmdLineOpts);
+	if (!succ)
+		return (EXIT_FAILURE);
 
 	FrameHandler frameHandler(pConfig); // frame reading, segmentation, drawing fcn
 	FrameHandler* pFrameHandler = &frameHandler;
 	config.attach(pFrameHandler);
 
 	// capSource must be open in order to set frame size
-	bool succ = frameHandler.openCapSource(false);
+	succ = frameHandler.openCapSource(false);
 	
 	// recalcFrameSizeDependentParams, if different frame size
-	int widthNew = static_cast<int>frameHandler.getFrameSize().width;
-	int heightNew = static_cast<int>frameHandler.getFrameSize().height;
+	int widthNew = static_cast<int>(frameHandler.getFrameSize().width);
+	int heightNew = static_cast<int>(frameHandler.getFrameSize().height);
 	int widthActual = stoi(config.getParam("frame_size_x"));
 	int heightActual = stoi(config.getParam("frame_size_y"));
 	if ( widthNew != widthActual || heightNew != heightActual ) 

@@ -67,7 +67,9 @@ public:
 //class CountRecorder;
 
 
-/// 
+/// collection of all tracks, updates them based on the moving blobs from new frame:
+/// create new tracks for unassigned blobs, delete orphaned tracks
+/// evaluate counting criteria (track length, track confidence)
 class SceneTracker : public Observer {
 private:
 	// adjustable parameters
