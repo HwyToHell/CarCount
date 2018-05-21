@@ -1,4 +1,14 @@
 /// TODO
+[2018-05-21]
+adjust test cases:
+logic moved from Config -> FrameHandler
+- adjustFrameSizeDependent Parameters
+- locateVideoFilePath 
+set up test cases:
+FrameHandler
+- initCam
+- initFileReader
+- getFrameSize
 [2018-04-15]
 - cmd line args: -q quiet flag (automatically takes pre-selected items in pick list)
 - implement changes in cmd line arg parsing (see ppt in red)

@@ -683,7 +683,7 @@ cv::Size2d CamInput::selectCamResolution(int defaultResolutionID) {
 	PickList::StrArray frameSizeArray;
 	int nCaps = enumerateStreamCaps();
 	if (nCaps == 0) {
-		cerr << "setCamResolution: no stream capablities available" << endl;
+		cerr << "selectCamResolution: no stream capablities available" << endl;
 		return frameSize;
 	}
 	for (int iCap = 0; iCap < nCaps; ++iCap) {
@@ -696,7 +696,7 @@ cv::Size2d CamInput::selectCamResolution(int defaultResolutionID) {
 	// select one from pick list
 	PickList resolution("resolution", &frameSizeArray);
 	if (defaultResolutionID >= static_cast<int>(frameSizeArray.size()) ) {
-		cerr << "default resolution ID out of range -> set to zero" << endl;
+		cerr << "selectCamResolution: default resolution ID out of range -> set to zero" << endl;
 		defaultResolutionID = 0;
 	}
 	resolution.setSelection(defaultResolutionID);
@@ -704,7 +704,7 @@ cv::Size2d CamInput::selectCamResolution(int defaultResolutionID) {
 	// set selected resolution
 	int frameSizeId = resolution.getSelection();
 	if (!setResolution(frameSizeId)) {
-		cerr << "setCamResolution: resolution cannot be set" << endl;
+		cerr << "selectCamResolution: resolution cannot be set" << endl;
 	} else {
 		frameSize.width = get(CV_CAP_PROP_FRAME_WIDTH);
 		frameSize.height = get(CV_CAP_PROP_FRAME_HEIGHT);

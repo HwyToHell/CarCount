@@ -16,6 +16,9 @@ public:
 	bool setValue(std::string& value);
 };
 
+// parameters used by application
+extern const char* configParams[24];
+
 /// config: hold application parameters, command line parsing,
 /// read from / write to sqlite config file,
 /// automatic update of subscribed observers
@@ -23,13 +26,11 @@ class Config : public Subject {
 public:
 	Config();
 	~Config();
-	void		adjustFrameSizeDependentParams(int new_size_x, int new_size_y); // TODO implementation
 	std::string getParam(std::string name);
 	bool		insertParam(Parameter param);
-	bool		locateVideoFile(std::string fileName);
 	bool		readCmdLine(ProgramOptions po);
-	bool		readConfigFile(std::string configFile); 
-	bool		saveConfigToFile(); // TODO implementation
+	bool		readConfigFile(std::string configFilePath = ""); 
+	bool		saveConfigToFile(std::string configFilePath = "");
 	bool		setParam(std::string name, std::string value);
 
 private:
@@ -40,7 +41,7 @@ private:
 	std::string				m_homePath;
 	bool					m_quiet;
 	std::list<Parameter>	m_paramList;
-	std::string				m_videoFilePath;
+	std::string				m_videoFilePath; // TODO delete, as implemented in FrameHandler
 
 	// init: set path to application and con-fig file,
 	// create parameter list (with std values)
@@ -48,14 +49,11 @@ private:
 	bool					loadParamsFromDb();
 	bool					populateStdParams();
 	bool					queryDbSingle(const std::string& sql, std::string& value);
-	bool					saveParams(); // TODO move logic to readEnv()
 	bool					setAppPath(std::string appDir = "counter");
 	void					setConfigProps(	std::string configDirPath, 
 											std::string configFileName = "config.sqlite",
 											std::string configTable = "config");
-
 };
-
 
 // Helper
 void printCommandOptions();

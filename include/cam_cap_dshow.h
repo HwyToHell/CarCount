@@ -27,6 +27,18 @@ class SampleGrabberCallback;
 
 // replacement for cv::VideoCapture
 class CamInput {
+public:
+	CamInput();
+	~CamInput();
+
+	int				enumerateDevices();
+	double			get(int propID);				// opencv get frame size
+	bool			isOpened();						// opencv
+	bool			open(int deviceID);				// opencv
+	bool			open(int deviceID, int resolutionID);
+	bool			read(cv::Mat& bitmap);			// opencv 
+	void			release();						// opencv
+
 private:
 	std::vector<CamDevice>	m_deviceArray;
 	std::vector<StreamCaps> m_streamCapsArray;		// frame size
@@ -54,16 +66,4 @@ private:
 	bool			setDevice(int deviceID);
 	bool			setResolution(int capabilityID);
 	bool			stopGraph();
-
-public:
-	CamInput();
-	~CamInput();
-
-	int				enumerateDevices();
-	double			get(int propID);				// opencv get frame size
-	bool			isOpened();						// opencv
-	bool			open(int deviceID);				// opencv
-	bool			open(int deviceID, int resolutionID);
-	bool			read(cv::Mat& bitmap);			// opencv 
-	void			release();						// opencv
 };

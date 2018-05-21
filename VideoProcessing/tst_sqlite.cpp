@@ -21,23 +21,7 @@ int main(int argc, char* argv[]) {
 		cout << "default exeption" << endl;
 	}
 
-	string testFile("D:\\Users\\Holger\\counter\\xyz.sqlite");
-	Config config;
-
-	double before = (double)cv::getTickCount();
-	bool succ = config.saveConfigToFile(testFile);
-	double after = (double)cv::getTickCount();
-	double sec = (after - before) / cv::getTickFrequency();
-	cout << "config saved in " << sec << " seconds" << endl;
-
-	before = (double)cv::getTickCount();
-	succ = config.readConfigFile(testFile);
-	after = (double)cv::getTickCount();
-	sec = (after - before) / cv::getTickFrequency();
-	cout << "config read in " << sec << " seconds" << endl;
-	
-
-	/*
+	// sqlite api test
 	sqlite3* db = nullptr;
 	string dbFilePath("D:\\Users\\Holger\\counter\\xyz.sqlite");
 	int rc = sqlite3_open(dbFilePath.c_str(), &db);
@@ -53,8 +37,24 @@ int main(int argc, char* argv[]) {
 
 	// close db
 	rc = sqlite3_close(db);
-	*/
 
+
+	// performance test
+	string testFile("D:\\Users\\Holger\\counter\\xyz_perf.sqlite");
+	Config config;
+
+	double before = (double)cv::getTickCount();
+	bool succ = config.saveConfigToFile(testFile);
+	double after = (double)cv::getTickCount();
+	double sec = (after - before) / cv::getTickFrequency();
+	cout << "config saved in " << sec << " seconds" << endl;
+
+	before = (double)cv::getTickCount();
+	succ = config.readConfigFile(testFile);
+	after = (double)cv::getTickCount();
+	sec = (after - before) / cv::getTickFrequency();
+	cout << "config read in " << sec << " seconds" << endl;
+	
 	cout << "Press <enter> to exit" << endl;
 	string str;
 	getline(std::cin, str);

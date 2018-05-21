@@ -18,8 +18,14 @@ int main(int argc, char* argv[]) {
 	//  q(uiet)			quiet mode (take standard arguments from config file
 	//  r(ate):			cam fps
 	//  v(ideo size):	cam resolution ID (single digit number)
+	char* av[] = {
+		argv[0],
+		"-i",
+		"traffic320x240.avi" };
+	int ac = sizeof(av) / sizeof(av[0]);
 
-	ProgramOptions cmdLineOpts(argc, argv, "i:qr:v:");
+	ProgramOptions cmdLineOpts(ac, av, "i:qr:v:");
+	//ProgramOptions cmdLineOpts(argc, argv, "i:qr:v:");
 	Config config;
 	Config* pConfig = &config;
 
@@ -32,7 +38,9 @@ int main(int argc, char* argv[]) {
 	config.attach(pFrameHandler);
 
 	// capSource must be open in order to set frame size
-	succ = frameHandler.openCapSource(false);
+	string videoFilePath = frameHandler.locateFilePath("traffic320x240.avi");
+	succ = frameHandler.initFileReader(videoFilePath);
+	cv::Size2d frameSize = frameHandler.getFrameSize();
 	
 	// recalcFrameSizeDependentParams, if different frame size
 	int widthNew = static_cast<int>(frameHandler.getFrameSize().width);
@@ -40,8 +48,9 @@ int main(int argc, char* argv[]) {
 	int widthActual = stoi(config.getParam("frame_size_x"));
 	int heightActual = stoi(config.getParam("frame_size_y"));
 	if ( widthNew != widthActual || heightNew != heightActual ) 
-		 config.adjustFrameSizeDependentParams(widthNew, heightNew);
+		 frameHandler.adjustFrameSizeDependentParams(widthNew, heightNew);
 
+	//frameHandler.loadInset("inset03.png");
 
 	SceneTracker scene(pConfig); // collection of tracks and vehicles with MOG2
 	SceneTracker* pScene = &scene;
@@ -62,9 +71,6 @@ int main(int argc, char* argv[]) {
 	 * if (!frameHandler.openCapSource(true)) 
 	 *	return -1;
 	 */
-
-	config.locateVideoFile("traffic.avi");
-	
 
 	while(true)
 	{
