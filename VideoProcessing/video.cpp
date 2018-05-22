@@ -50,7 +50,7 @@ int main(int argc, char* argv[]) {
 	if ( widthNew != widthActual || heightNew != heightActual ) 
 		 frameHandler.adjustFrameSizeDependentParams(widthNew, heightNew);
 
-	//frameHandler.loadInset("inset03.png");
+	frameHandler.loadInset("inset3.png");
 
 	SceneTracker scene(pConfig); // collection of tracks and vehicles with MOG2
 	SceneTracker* pScene = &scene;

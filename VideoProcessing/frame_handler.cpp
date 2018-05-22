@@ -12,7 +12,8 @@ FrameHandler::FrameHandler(Config* pConfig) :
 	Observer(pConfig), 
 	mMog2(100, 25, false),
 	m_isCaptureInitialized(false),
-	m_captureWinCam(nullptr) {
+	m_captureWinCam(nullptr),
+	mFrameCounter(0) {
 
 	// instantiate cam input
 	#if defined (_WIN32)
@@ -264,20 +265,20 @@ bool FrameHandler::loadInset(std::string insetFile) {
 	}
 
 	// load inset image to display counting results on
-	string inset_path = mSubject->getParam("application_path");
-	inset_path += insetFile;
-	if (!isFileExist(inset_path)) {
-		cerr << "loadInset: path to inset image does not exist: " << inset_path << endl;
+	string insetPath = mSubject->getParam("application_path");
+	appendDirToPath(insetPath,insetFile);
+	if (!isFileExist(insetPath)) {
+		cerr << "loadInset: path to inset image does not exist: " << insetPath << endl;
 	}
 
-	cv::Mat inset_org = cv::imread(inset_path);
+	cv::Mat inset_org = cv::imread(insetPath);
 	if (inset_org.data) { 
 		// use loaded image, fit to current frame size
 		cv::Size insetSize = inset_org.size();
 		double scaling = m_frameSize.width / (double)insetSize.width;
 		cv::resize(inset_org, m_inset, cv::Size(), scaling, scaling);
 	} else { // create black matrix with same dimensions
-		cerr << "loadInset: could not open " << inset_path << ", use substitute inset" << endl;
+		cerr << "loadInset: could not open " << insetPath << ", use substitute inset" << endl;
 		int width = (int)m_frameSize.width;
 		int height = stoi(mSubject->getParam("inset_height"));
 		cv::Mat insetSubst(height, width, CV_8UC3, black);
@@ -374,9 +375,11 @@ bool FrameHandler::segmentFrame() {
 
 void FrameHandler::showFrame(std::list<Track>& tracks, CountResults cr) {
 	// show inset with vehicle icons and arrows
-	if (m_inset.data)
+	if (m_inset.data) {
 		// TODO adjust copy position depending on frame size
-		m_inset.copyTo(mFrame(cv::Rect(0,177, m_inset.cols, m_inset.rows)));
+		int yInset = mFrame.rows - m_inset.rows; 
+		m_inset.copyTo(mFrame(cv::Rect(0, yInset, m_inset.cols, m_inset.rows)));
+	}
 		
 	// show frame counter, int font = cnt % 8;
 	cv::putText(mFrame, std::to_string((long long)mFrameCounter), cv::Point(10,20), 0, 0.5, green, 1);

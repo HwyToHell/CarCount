@@ -105,10 +105,12 @@ SampleGrabberCallback::SampleGrabberCallback() {
 	InitializeCriticalSection(&m_lockBufferCopy);
 	m_newFrameEvent = CreateEvent(nullptr, true, false, L"new frame");
 	m_timeMeasurement = true;
+	m_bitmap = nullptr;
 }
 
 SampleGrabberCallback::~SampleGrabberCallback() {
-	delete[] m_bitmap;
+	if (m_bitmap)
+		delete[] m_bitmap;
 	DeleteCriticalSection(&m_lockBufferCopy);
 	CloseHandle(m_newFrameEvent);
 }
@@ -246,6 +248,8 @@ bool SampleGrabberCallback::setBitmapSize(long height, long width, int nByteDept
 		m_width = width;
 		m_depth = nByteDepth;
 		int bitmapSize = height * width * nByteDepth;
+		if (m_bitmap)
+			delete[] m_bitmap;
 		m_bitmap = new BYTE[bitmapSize];
 		return true;
 	}
@@ -269,7 +273,10 @@ CamInput::CamInput() {
 	// init direct show interface pointers
 	m_captureBuilder = nullptr;
 	m_graphBuilder = nullptr;
+	m_sampleGrabber = nullptr;
+	
 	m_mediaControl = nullptr;
+	m_videoWindow = nullptr;
 
 	m_camSrcFilter = nullptr;
 	m_grabFilter = nullptr;
@@ -279,6 +286,7 @@ CamInput::CamInput() {
 
 	// add sample grabber callback
 	m_sGrabCallBack = new SampleGrabberCallback;
+
 }
 
 
@@ -290,7 +298,7 @@ void releaseMoniker(CamDevice& camDevice) {
 
 CamInput::~CamInput() {
 	// stop graph, if still running
-	if (&CamInput::isGraphRunning) {
+	if (isGraphRunning()) {
 		m_mediaControl->Stop();
 	}
 
@@ -301,18 +309,27 @@ CamInput::~CamInput() {
 	// release moniker for each cam device
 	std::for_each(m_deviceArray.begin(), m_deviceArray.end(), releaseMoniker);
 
-	m_captureBuilder->Release();
-	m_graphBuilder->Release();
-	m_sampleGrabber->Release();
+	if (m_captureBuilder)
+		m_captureBuilder->Release();
+	if (m_graphBuilder)
+		m_graphBuilder->Release();
+	if (m_sampleGrabber)
+		m_sampleGrabber->Release();
 
-	m_mediaControl->Release();
-	m_videoWindow->Release();
+	if (m_mediaControl)
+		m_mediaControl->Release();
+	if (m_videoWindow)
+		m_videoWindow->Release();
 	
-	m_camSrcFilter->Release();
-	m_grabFilter->Release();
-	m_renderFilter->Release();
+	if (m_camSrcFilter)
+		m_camSrcFilter->Release();
+	if (m_grabFilter)
+		m_grabFilter->Release();
+	if (m_renderFilter)
+		m_renderFilter->Release();
 
 	delete m_sGrabCallBack;
+
 
 	CoUninitialize();
 }
