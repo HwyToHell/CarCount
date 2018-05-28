@@ -17,13 +17,43 @@ public:
 };
 
 // parameters used by application
-extern const char* configParams[24];
+// extern const char* configParams[24];
+// static == internal linkage 
+// -> each module uses separate const var, but with same const value
+// -> embracing with anonymous namespace {} would also work
+
+const char* const configParams[] = {
+	"application_path",
+	"video_file",
+	"is_video_from_cam",
+	"cam_device_ID",
+	"cam_resolution_ID",
+	"cam_fps",
+	"frame_size_x",
+	"frame_size_y",
+	"inset_height",
+	"roi_x",
+	"roi_y",
+	"roi_width",
+	"roi_height",
+	"blob_area_min",
+	"blob_area_max",
+	"track_max_confidence",
+	"track_max_deviation",
+	"track_max_distance",
+	"max_n_of_tracks",
+	"count_confidence",
+	"count_pos_x", 
+	"count_track_length",
+	"truck_width_min",
+	"truck_height_min" };
 
 /// config: hold application parameters, command line parsing,
 /// read from / write to sqlite config file,
 /// automatic update of subscribed observers
 class Config : public Subject {
 public:
+	// TODO second constructor with config file name specified
 	Config();
 	~Config();
 	std::string getParam(std::string name);

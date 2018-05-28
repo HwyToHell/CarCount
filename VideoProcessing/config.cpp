@@ -39,7 +39,7 @@ public:
 //////////////////////////////////////////////////////////////////////////////
 // parameter names used by application ///////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
-const char* configParams[] = {
+/*const char* configParams[] = {
 	"application_path",
 	"video_file",
 	"is_video_from_cam",
@@ -64,7 +64,7 @@ const char* configParams[] = {
 	"count_track_length",
 	"truck_width_min",
 	"truck_height_min" };
-
+	*/
 
 //////////////////////////////////////////////////////////////////////////////
 // Config ////////////////////////////////////////////////////////////////////
@@ -117,7 +117,7 @@ bool Config::init() {
 	}
 
 	// set path to config file and table name
-	setConfigProps(m_appPath, "config");
+	setConfigProps(m_appPath, "config.sqlite", "config");
 		
 	return true;
 }

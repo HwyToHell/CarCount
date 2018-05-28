@@ -9,7 +9,7 @@
 
 using namespace std;
 
-int main(int argc, char* argv[]) {
+int _main(int argc, char* argv[]) {
 	// TODO define region of interest --> TODO: select graphical -or- detect by optical flow
 	
 	// command line arguments

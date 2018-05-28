@@ -9,6 +9,7 @@ typedef cv::Rect_ <double> Rect2d; // delete, if opencv > v3.0
 const cv::Scalar black	= cv::Scalar(0,0,0);
 const cv::Scalar blue	= cv::Scalar(255,0,0);
 const cv::Scalar red	= cv::Scalar(0,0,255);
+const cv::Scalar gray	= cv::Scalar(128,128,128);
 const cv::Scalar green	= cv::Scalar(0,255,0);
 const cv::Scalar orange = cv::Scalar(0,128,255);
 const cv::Scalar yellow = cv::Scalar(0,255,255);
