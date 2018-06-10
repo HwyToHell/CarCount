@@ -5,9 +5,352 @@
 #include <sstream>
 
 
+//////////////////////////////////////////////////////////////////////////////
+// Arrow /////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+Arrow::Arrow(cv::Point start, cv::Point end, cv::Scalar color, int thickness):
+	m_start(start),
+	m_end(end),
+	m_color(color),
+	m_thickness(thickness) {
+}
+
+
+void Arrow::put(cv::Mat& image) {
+	arrowedLine(image, m_start, m_end, m_color, m_thickness, 8, 0, 0.05);
+	return;
+}
+
+
+//////////////////////////////////////////////////////////////////////////////
+// Font /////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+Font::Font():
+	face(cv::FONT_HERSHEY_SIMPLEX), 
+	scale(0.5),
+	color(white),
+	thickness(1) {
+}
+
+
+//////////////////////////////////////////////////////////////////////////////
+// TextRow ///////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+TextRow::TextRow(const int orgY, const Font font):
+	m_font(font), m_origin(cv::Point(0,orgY)) {
+}
+
+
+/// Get text width in pixels
+/// \return Width of text in pixels
+int TextRow::getWidth() {
+	int baseLine;
+	cv::Size textSize = cv::getTextSize(m_text, m_font.face, m_font.scale,
+		m_font.thickness, &baseLine);
+	return textSize.width;
+}
+
+
+/// Draw actual text of row on image
+/// \param[in] image Image to draw on
+/// \param[in] colOrigin Column origin in pixels
+void TextRow::put(cv::Mat& image, cv::Point colOrigin) {
+	cv::Point rowOrigin = colOrigin + m_origin;
+	cv::putText(image, m_text, rowOrigin, m_font.face, m_font.scale, m_font.color, m_font.thickness);
+	return;
+}
+
+/// Set horizontal indentation according to row alignment (left, right)
+/// \param[in] rowAlign (left, right)
+/// \param[in] colWidth Column width in pixels
+void TextRow::setIndent(Align rowAlign, int maxTextWidth) {
+
+	// calc text width for row
+	int baseLine;
+	cv::Size textSize = cv::getTextSize(m_text, m_font.face, m_font.scale,
+			m_font.thickness, &baseLine);
+
+	// calc origin depending on alignment
+	if (rowAlign == Align::left) {
+		m_origin.x = 0;
+	} else { // right align
+		m_origin.x = maxTextWidth - textSize.width;
+	}
+}
+
+
+/// Set text, if text width fits into available column width
+/// otherwise fill available space with '#'
+/// \param[in] text Text to set
+/// \param[in] colWidth Column width in pixels
+/// \return Width of text in pixels
+int TextRow::setText(const std::string& text, const int colWidth) {
+	int baseLine;
+	cv::Size textSize = cv::getTextSize(text, m_font.face, m_font.scale,
+		m_font.thickness, &baseLine);
+	
+	// fill with '#', if text too wide
+	if (textSize.width < colWidth) {
+		m_text = text;
+	} else { // text too wide
+		std::string textTooLong;
+		cv::Size oneChar = cv::getTextSize("#", m_font.face, m_font.scale,
+			m_font.thickness, &baseLine);
+		int numChar = colWidth / oneChar.width;
+		for (int n = 0; n < numChar; ++n) 
+			textTooLong.push_back('#');
+		textSize = cv::getTextSize(textTooLong, m_font.face, m_font.scale,
+			m_font.thickness, &baseLine);
+		m_text = textTooLong;
+	}
+	return textSize.width;
+}
 
 
 
+//////////////////////////////////////////////////////////////////////////////
+// TextColumn ////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+TextColumn::TextColumn(const cv::Point origin, const int colWidth, const Align colAlign):
+	m_origin(origin), m_colWidth(colWidth), m_colAlign(colAlign) {}
+
+
+/// Add text row to column block
+/// \param[in] originY Vertical position of row text in pixels
+/// \param[in] fon Font structure for row text
+/// \return row index of added row
+int TextColumn::addRow(const int originY, const Font font) {
+	m_rowArray.push_back(TextRow(originY, font));
+	int index = m_rowArray.size() - 1;
+	return index;
+}
+
+
+// TextColumn::alignRows() functor for getting maximum width of all rows
+class MaxRowWidth {
+public:
+	MaxRowWidth(): m_maxWidth(0) {};
+	void operator() (TextRow& textRow) {
+		if (textRow.getWidth() > m_maxWidth)
+			m_maxWidth =  textRow.getWidth();
+	}
+	int	getWidth() {
+		return m_maxWidth;
+	}
+private:
+	int		m_maxWidth;
+};
+
+
+// TextColumn::alignRows() functor for setting row indentation
+class SetRowIndent {
+public:
+	SetRowIndent(Align align, int textWidth): 
+			m_align(align),
+			m_textWidth(textWidth)
+			{};
+	void operator() (TextRow& textRow) {
+		textRow.setIndent(m_align, m_textWidth);
+	}
+private:
+	Align	m_align;
+	int		m_textWidth;
+};
+
+
+/// Align text column block
+/// \param[in] rowAlign Alignment of single text row (left, right)
+/// \param[in] colAlign Alignment of embracing rectangle of text colum block (left, right)
+/// \return True, if all texfields can be displayed in full length
+void TextColumn::alignRows(Align rowAlign) {
+
+	// get max text width in pixels for all rows
+	MaxRowWidth maxRowWidth = std::for_each(m_rowArray.begin(), m_rowArray.end(), MaxRowWidth() );
+	m_maxTextWidth = maxRowWidth.getWidth();
+
+	// set row alignment for each row
+	std::for_each(m_rowArray.begin(), m_rowArray.end(), SetRowIndent(rowAlign, m_maxTextWidth) );
+	return;
+}
+
+
+/// Remove row
+/// \param[in] rowIdx Row index
+/// \return True, if row was successfully removed
+bool TextColumn::removeRow(const int rowIdx) {
+	size_t idx = static_cast<size_t>(rowIdx);
+	if (idx >= m_rowArray.size() ) {
+		std::cerr << "removeRow: row index: " << idx << " out of array size: " 
+			<< m_rowArray.size() << std::endl;
+		return false;
+	} else { // index within bounds
+		m_rowArray.erase(m_rowArray.begin() + rowIdx);
+		return true;
+	}
+}
+
+
+/// Draw text of all rows in column on image
+/// column block left or right aligned
+/// \param[in] image Image to draw on
+void TextColumn::put(cv::Mat& image) {
+	// no extra indent for left aligned
+	cv::Point offset(0,0);
+	
+	// extra indent for right aligned column
+	if (m_colAlign == Align::right)
+		offset.x = m_colWidth - m_maxTextWidth;
+
+	// show each row with offset applied
+	RowArray::iterator iRow = m_rowArray.begin();
+	while (iRow != m_rowArray.end()) {
+		iRow->put(image, m_origin + offset);
+		++iRow;
+	}
+}
+
+
+/// Resize text column
+/// \param[in] origin Origin of text column
+/// \param[in] width Width of text column
+/// \return True, if text for given row was successfully set
+void TextColumn::resize(const cv::Point origin, const int colWidth) {
+	m_origin = origin;
+	m_colWidth = colWidth;
+	return;
+}
+
+
+/// Set text for row
+/// \param[in] rowIdx Row index
+/// \param[in] text Text to set
+/// \return True, if text for given row was successfully set
+bool TextColumn::setRowText(const int rowIdx, const std::string& text) {
+	size_t idx = static_cast<size_t>(rowIdx);
+	if (idx >= m_rowArray.size() ) {
+		std::cerr << "setRowText: row index: " << idx << " out of array size: " 
+			<< m_rowArray.size() << std::endl;
+		return false;
+	} else { // index within bounds
+		m_rowArray.at(rowIdx).setText(text, m_colWidth);
+		return true;
+	}
+}
+
+
+
+
+
+//////////////////////////////////////////////////////////////////////////////
+// Inset /////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+Inset::Inset(cv::Mat image) : backGrndImage(image), composedImage(image) {}
+
+
+/// create arrow pointing to left or right
+/// based on inset image origin
+Arrow Inset::createArrow(const Align pointsTo) {
+	// layout
+	// left border | arrow to left | divider | arrow to right | right border
+	int length = backGrndImage.size().width * 10 / 24;
+	int xBorder = backGrndImage.size().width * 1 / 24;
+	int yBorder = backGrndImage.size().height * 3 / 24;
+
+	// appearance
+	int thickness = (backGrndImage.size().width > 200) ? (backGrndImage.size().width / 200) : 1;
+
+	// arrow coords depending on points to
+	cv::Point start(0,0), end(0,0);
+	if (pointsTo == Align::left) {	// arrow to left
+		start = cv::Point(xBorder + length, yBorder);
+		end = cv::Point(xBorder, yBorder);
+	} else {						// arrow to right
+		start = cv::Point(backGrndImage.size().width - xBorder - length, yBorder);
+		end = cv::Point(backGrndImage.size().width - xBorder, yBorder);
+	}
+
+	return Arrow(start, end, green, thickness);
+}
+
+
+/// create left or right column based on inset size
+/// text column origin relative to inset origin
+TextColumn Inset::createTextColumn(const  Align colAlign) {
+	// layout:
+	// left border | image column | text column | divider | text column | image column | right border
+	int widthImageCol = backGrndImage.size().width * 3 / 24;
+	int widthTextCol = backGrndImage.size().width * 8 / 24;
+
+	// yOrigin = 0 -> top of inset
+	int yOrigin = 0;
+
+	// xOrigin based on alignment
+	int xOrigin = 0;
+	if (colAlign == Align::right)
+		xOrigin = backGrndImage.size().width - widthImageCol - widthTextCol;
+	else
+		xOrigin = widthImageCol;
+
+	// create temp column as ret val
+	TextColumn textCol(cv::Point(xOrigin, yOrigin), widthTextCol, colAlign);
+
+	// font for all rows
+	Font font;
+	font.face      = cv::FONT_HERSHEY_SIMPLEX;
+	font.scale	   = static_cast<double>(backGrndImage.size().width) / 600;
+	font.color	   = green;
+	font.thickness = (backGrndImage.size().width > 200) ? (backGrndImage.size().width / 200) : 1;
+
+	// calculate row origins from inset size
+	int yFirstRow = backGrndImage.size().height * 11 / 24;
+	int ySecondRow = backGrndImage.size().height * 20 / 24; 
+
+	// insert rows
+	textCol.addRow(yFirstRow, font);
+	textCol.addRow(ySecondRow, font);
+
+	return textCol;
+}
+
+
+
+void Inset::putCount(CountResults cr) {
+	// compose image from background
+	composedImage = backGrndImage.clone();
+
+	// set text at left text column
+	std::string carLeft = std::to_string(static_cast<long long>(cr.carLeft));
+	textLeft.setRowText(0, carLeft);
+	std::string truckLeft = std::to_string(static_cast<long long>(cr.truckLeft));
+	textLeft.setRowText(1, truckLeft);
+
+	// right-align rows of left column depending on set text
+	textLeft.alignRows(Align::right);
+
+	// set text at right text column
+	std::string carRight = std::to_string(static_cast<long long>(cr.carRight));
+	textRight.setRowText(0, carRight);
+	std::string truckRight = std::to_string(static_cast<long long>(cr.truckRight));
+	textRight.setRowText(1, truckRight);
+
+	// right-align rows of right column depending on set text
+	textRight.alignRows(Align::right);
+
+	// show arrows in output image
+	arrowLeft.put(composedImage);
+	arrowRight.put(composedImage);
+
+	// show text in output image
+	textLeft.put(composedImage);
+	textRight.put(composedImage);
+		
+	return;
+}
+
+
+//////////////////////////////////////////////////////////////////////////////
+// FrameHandler //////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
 FrameHandler::FrameHandler(Config* pConfig) : 
 	Observer(pConfig), 
 	mMog2(100, 25, false),
@@ -33,9 +376,9 @@ void FrameHandler::adjustFrameSizeDependentParams(int new_size_x, int new_size_y
 	try {
 		// roi
 		long long roi_x = stoi(mSubject->getParam("roi_x")) * new_size_x / old_size_x;
-		long long roi_width =  stoi(mSubject->getParam("roi_x")) * new_size_x / old_size_x;
+		long long roi_width =  stoi(mSubject->getParam("roi_width")) * new_size_x / old_size_x;
 		long long roi_y = stoi(mSubject->getParam("roi_y")) * new_size_y / old_size_y;
-		long long roi_height = stoi(mSubject->getParam("roi_y")) * new_size_y / old_size_y;	
+		long long roi_height = stoi(mSubject->getParam("roi_height")) * new_size_y / old_size_y;	
 		mSubject->setParam("roi_x", to_string(roi_x));
 		mSubject->setParam("roi_width", to_string(roi_width));
 		mSubject->setParam("roi_y", to_string(roi_y));
@@ -45,18 +388,18 @@ void FrameHandler::adjustFrameSizeDependentParams(int new_size_x, int new_size_y
 		long long inset_height = stoi(mSubject->getParam("inset_height")) * new_size_y / old_size_y;
 		mSubject->setParam("inset_height", to_string(inset_height));
 
-		// blob assignment
-		long long blob_area_min =  stoi(mSubject->getParam("blob_area_min")) * new_size_x * new_size_y 
-			/ old_size_x / old_size_y;
-		long long blob_area_max =  stoi(mSubject->getParam("blob_area_max")) * new_size_x * new_size_y 
-			/ old_size_x / old_size_y;
+		// blob assignment - long long cast to prevent int 32bit overflow
+		long long blob_area_min =  static_cast<long long>(stoi(mSubject->getParam("blob_area_min"))) 
+			* new_size_x * new_size_y / old_size_x / old_size_y;
+		long long blob_area_max =  static_cast<long long>(stoi(mSubject->getParam("blob_area_max")))
+			* new_size_x * new_size_y / old_size_x / old_size_y;
 		mSubject->setParam("blob_area_min", to_string(blob_area_min));
 		mSubject->setParam("blob_area_max", to_string(blob_area_max));
 
 		// track assignment
-		long long track_max_dist =  stoi(mSubject->getParam("track_max_distance")) * (new_size_x / old_size_x
-			+ new_size_y / old_size_y) / 2;
-		mSubject->setParam("track_max_distance", to_string(track_max_dist));
+		double track_max_dist =  stod(mSubject->getParam("track_max_distance")) * 0.5 
+			* (static_cast<double>(new_size_x) / old_size_x	+ static_cast<double>(new_size_y) / old_size_y);
+		mSubject->setParam("track_max_distance", to_string(static_cast<long long>(round(track_max_dist))));
 
 		// count pos, count track length
 		long long count_pos_x =  stoi(mSubject->getParam("count_pos_x")) * new_size_x / old_size_x;
@@ -101,6 +444,52 @@ std::list<TrackEntry>& FrameHandler::calcBBoxes() {
 	
 	return mBBoxes;
 }
+
+/// load inset background from file, fit to frame size
+/// create decoration and gauges
+Inset FrameHandler::createInset(std::string insetFilePath) {
+	using namespace std;
+
+	cv::Size frameSize(static_cast<cv::Size>(m_frameSize));
+	if (frameSize.width == 0 || frameSize.height == 0) {
+		cerr << "createInset: wrong frame size: " << frameSize << endl;
+	}
+
+	// load background image for inset
+	if (!isFileExist(insetFilePath)) {
+		cerr << "createInset: path to inset image does not exist: " << insetFilePath << endl;
+	}
+	cv::Mat imageOriginal = cv::imread(insetFilePath);
+	
+	// fit image size to frame size 	
+	cv::Mat imageFitToFrame;
+	if (imageOriginal.data) { 
+		// use loaded image, fit to current frame size
+		cv::Size imageSize = imageOriginal.size();
+		double scaling = frameSize.width / (double)imageSize.width;
+		cv::resize(imageOriginal, imageFitToFrame, cv::Size(), scaling, scaling);
+	} else { // create black matrix with same dimensions
+		cerr << "createInset: could not open " << insetFilePath << ", use substitute inset" << endl;
+		int width = (int)frameSize.width;
+		int height = 65;
+		cv::Mat substitute(height, width, CV_8UC3, black);
+		imageFitToFrame = substitute;
+	}
+	
+	// create inset object with background image
+	Inset inset = Inset(imageFitToFrame);
+
+	// create arrows
+	inset.arrowLeft = inset.createArrow(Align::left);
+	inset.arrowRight = inset.createArrow(Align::right);
+
+	// create text columns
+	inset.textLeft = inset.createTextColumn(Align::left);
+	inset.textRight = inset.createTextColumn(Align::right);
+
+	return inset;
+}
+
 
 
 int FrameHandler::getFrameInfo() {
@@ -256,38 +645,6 @@ std::string FrameHandler::locateFilePath(std::string fileName) {
 	return string("");
 }
 
-bool FrameHandler::loadInset(std::string insetFile) {
-	using namespace std;
-	// capture source must be initialized in order to obtain correct frame size
-	if (!m_isCaptureInitialized) {
-		cerr << "loadInset: capture source must be initialized" << endl;
-		return false;
-	}
-
-	// load inset image to display counting results on
-	string insetPath = mSubject->getParam("application_path");
-	appendDirToPath(insetPath,insetFile);
-	if (!isFileExist(insetPath)) {
-		cerr << "loadInset: path to inset image does not exist: " << insetPath << endl;
-	}
-
-	cv::Mat inset_org = cv::imread(insetPath);
-	if (inset_org.data) { 
-		// use loaded image, fit to current frame size
-		cv::Size insetSize = inset_org.size();
-		double scaling = m_frameSize.width / (double)insetSize.width;
-		cv::resize(inset_org, m_inset, cv::Size(), scaling, scaling);
-	} else { // create black matrix with same dimensions
-		cerr << "loadInset: could not open " << insetPath << ", use substitute inset" << endl;
-		int width = (int)m_frameSize.width;
-		int height = stoi(mSubject->getParam("inset_height"));
-		cv::Mat insetSubst(height, width, CV_8UC3, black);
-		m_inset = insetSubst;
-	}
-
-	return true;
-}
-
 
 bool FrameHandler::openCapSource(bool fromFile) {
 	using namespace std;
@@ -329,7 +686,7 @@ bool FrameHandler::segmentFrame() {
 	if (m_isFileCapture) {
 		isSuccess = m_capture.read(mFrame);
 		if (!isSuccess) {
-			std::cout << "segmentFrame: annot read frame from file" << std::endl;
+			std::cout << "segmentFrame: cannot read frame from file" << std::endl;
 			return false;
 		}
 
@@ -373,14 +730,7 @@ bool FrameHandler::segmentFrame() {
 }
 
 
-void FrameHandler::showFrame(std::list<Track>& tracks, CountResults cr) {
-	// show inset with vehicle icons and arrows
-	if (m_inset.data) {
-		// TODO adjust copy position depending on frame size
-		int yInset = mFrame.rows - m_inset.rows; 
-		m_inset.copyTo(mFrame(cv::Rect(0, yInset, m_inset.cols, m_inset.rows)));
-	}
-		
+void FrameHandler::showFrame(std::list<Track>& tracks, Inset inset) {
 	// show frame counter, int font = cnt % 8;
 	cv::putText(mFrame, std::to_string((long long)mFrameCounter), cv::Point(10,20), 0, 0.5, green, 1);
 	cv::rectangle(mFrame, mRoi, blue);
@@ -406,12 +756,14 @@ void FrameHandler::showFrame(std::list<Track>& tracks, CountResults cr) {
 		++iTrack;
 	}
 
-	// show vehicle counter
-	cv::putText(mFrame, std::to_string((long long)cr.carLeft), cv::Point(125,206), 0, 0.5, green, 2);
-	cv::putText(mFrame, std::to_string((long long)cr.truckLeft), cv::Point(125,230), 0, 0.5, green, 2);
-	cv::putText(mFrame, std::to_string((long long)cr.carRight), cv::Point(185,206), 0, 0.5, green, 2);
-	cv::putText(mFrame, std::to_string((long long)cr.truckRight), cv::Point(185,230), 0, 0.5, green, 2);
+	// copy inset with vehicle counter to frame
+	if (inset.composedImage.data) {
+		// TODO adjust copy position depending on frame size
+		int yInset = mFrame.rows - inset.composedImage.rows; 
+		inset.composedImage.copyTo(mFrame(cv::Rect(0, yInset, inset.composedImage.cols, inset.composedImage.rows)));
+	}
 
+	// display image
 	cv::imshow(mFrameWndName, mFrame);
 }
 

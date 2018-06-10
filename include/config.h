@@ -17,7 +17,7 @@ public:
 };
 
 // parameters used by application
-// extern const char* configParams[24];
+// extern const char* configParams[25];
 // static == internal linkage 
 // -> each module uses separate const var, but with same const value
 // -> embracing with anonymous namespace {} would also work
@@ -32,6 +32,7 @@ const char* const configParams[] = {
 	"frame_size_x",
 	"frame_size_y",
 	"inset_height",
+	"inset_file",
 	"roi_x",
 	"roi_y",
 	"roi_width",

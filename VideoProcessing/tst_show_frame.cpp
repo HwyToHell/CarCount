@@ -2,44 +2,11 @@
 
 #include "../include/frame_handler.h"
 
-#pragma warning(disable: 4482)
-
-
-
-
-//////////////////////////////////////////////////////////////////////////////
-// Types /////////////////////////////////////////////////////////////////////
-//////////////////////////////////////////////////////////////////////////////
-enum Align {left, right};
-
-struct Font {
-	int			face;
-	double		scale;
-	cv::Scalar	color;
-	int			thickness;
-	Font(): face(cv::FONT_HERSHEY_SIMPLEX), 
-			scale(0.5),
-			color(white),
-			thickness(1) {}
-};
-
 
 
 //////////////////////////////////////////////////////////////////////////////
 // Arrow /////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
-class Arrow {
-public:
-	Arrow(cv::Point start, cv::Point end, cv::Scalar color = green, int thickness = 1);
-	void put(cv::Mat& image);
-private:
-	cv::Point	m_start;
-	cv::Point	m_end;
-	cv::Scalar	m_color;
-	int			m_thickness;
-};
-
-
 Arrow::Arrow(cv::Point start, cv::Point end, cv::Scalar color, int thickness):
 	m_start(start),
 	m_end(end),
@@ -54,24 +21,20 @@ void Arrow::put(cv::Mat& image) {
 }
 
 
+//////////////////////////////////////////////////////////////////////////////
+// Font /////////////////////////////////////////////////////////////////////
+//////////////////////////////////////////////////////////////////////////////
+Font::Font():
+	face(cv::FONT_HERSHEY_SIMPLEX), 
+	scale(0.5),
+	color(white),
+	thickness(1) {
+}
+
 
 //////////////////////////////////////////////////////////////////////////////
 // TextRow ///////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
-class TextRow {
-public:
-			TextRow(const int orgY = 0, const Font font = Font());
-	int		getWidth();
-	void	setIndent(const Align rowAlign, const int colWidth);
-	int		setText(const std::string& text, const int colWidth);
-	void	put(cv::Mat& frame, cv::Point colOrigin);
-private:
-	Font		m_font;
-	cv::Point	m_origin;
-	std::string m_text;
-};
-
-
 TextRow::TextRow(const int orgY, const Font font):
 	m_font(font), m_origin(cv::Point(0,orgY)) {
 }
@@ -147,27 +110,6 @@ int TextRow::setText(const std::string& text, const int colWidth) {
 //////////////////////////////////////////////////////////////////////////////
 // TextColumn ////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
-class TextColumn {
-public:
-	TextColumn(const cv::Point origin = cv::Point(0,0), const int colWidth = 0,
-		const Align colAlign = Align::left);
-	int		addRow(const int originY, const Font font = Font());
-	void	alignRows(const Align rowAlign);
-	bool	removeRow(const int rowIdx);
-	void	resize(const cv::Point origin, const int colWidth);
-	bool	setRowText(const int rowIdx, const std::string& text);
-	void	put(cv::Mat& image);
-
-private:
-	typedef		std::vector<TextRow> RowArray;
-	Align		m_colAlign;
-	int			m_colWidth;
-	int			m_maxTextWidth;
-	cv::Point	m_origin;
-	RowArray	m_rowArray;
-};
-
-
 TextColumn::TextColumn(const cv::Point origin, const int colWidth, const Align colAlign):
 	m_origin(origin), m_colWidth(colWidth), m_colAlign(colAlign) {}
 

@@ -8,6 +8,7 @@ struct CountResults {
 	int truckRight;
 	CountResults() : carLeft(0), carRight(0), truckLeft(0), truckRight(0) {}
 	CountResults operator+=(const CountResults& rhs);
+	void printResults();
 };
 
 
@@ -25,8 +26,8 @@ class CountRecorder {
 	int mTruckCntLeft;
 	int mTruckCntRight;
 public:
-	CountRecorder() : mCarCntLeft(0), mCarCntRight(0), 
-		mTruckCntLeft(0), mTruckCntRight(0) {}
+	CountRecorder();
+	CountRecorder(CountResults cr);
 	CountResults getStatus();
 	void updateCnt(bool movesLeft, bool isTruck = 0);
 	void printResults();

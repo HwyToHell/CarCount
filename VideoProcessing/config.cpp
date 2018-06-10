@@ -49,6 +49,7 @@ public:
 	"frame_size_x",
 	"frame_size_y",
 	"inset_height",
+	"inset_file",
 	"roi_x",
 	"roi_y",
 	"roi_width",
@@ -153,7 +154,7 @@ bool Config::loadParamsFromDb() {
 	string answer;
 
 	// wrap in transaction
-	sqlStmt = "BEGIN TRANSACTION";
+	sqlStmt = "BEGIN TRANSACTION;";
 	if (!queryDbSingle(sqlStmt, answer)) {
 		cerr << "loadParamsFromDb: begin transaction failed" << endl;
 		return false;
@@ -188,7 +189,7 @@ bool Config::loadParamsFromDb() {
 	}
 
 		// end transaction
-	sqlStmt = "END TRANSACTION";
+	sqlStmt = "END TRANSACTION;";
 	if (!queryDbSingle(sqlStmt, answer)) {
 		cerr << "loadParamsFromDb: end transaction failed" << endl;
 		return false;
@@ -215,6 +216,7 @@ bool Config::populateStdParams() {
 	m_paramList.push_back(Parameter("frame_size_x", "int", "320"));
 	m_paramList.push_back(Parameter("frame_size_y", "int", "240"));
 	m_paramList.push_back(Parameter("inset_height", "int", "64"));
+	m_paramList.push_back(Parameter("inset_file", "string", "inset4.png"));
 	
 	// region of interest
 	m_paramList.push_back(Parameter("roi_x", "int", "80"));
@@ -235,8 +237,8 @@ bool Config::populateStdParams() {
 	m_paramList.push_back(Parameter("count_pos_x", "int", "90")); // counting position (within roi)
 	m_paramList.push_back(Parameter("count_track_length", "int", "20")); // min track length for counting
 	// classification
-	m_paramList.push_back(Parameter("truck_width_min", "int", "60")); // classified as truck, if larger
-	m_paramList.push_back(Parameter("truck_height_min", "int", "28")); // classified as truck, if larger
+	m_paramList.push_back(Parameter("truck_width_min", "int", "55")); // classified as truck, if larger 60
+	m_paramList.push_back(Parameter("truck_height_min", "int", "26")); // classified as truck, if larger 28
 	return true;
 }
 
@@ -244,6 +246,8 @@ bool Config::populateStdParams() {
 bool Config::queryDbSingle(const std::string& sql, std::string& value) {
 	bool success = false;
 	sqlite3_stmt *stmt;
+	// empty value indicate error
+	value.clear();
 
 	int rc = sqlite3_prepare_v2(m_dbHandle, sql.c_str(), -1, &stmt, 0);
 	if (rc == SQLITE_OK)
@@ -387,14 +391,17 @@ bool Config::readCmdLine(ProgramOptions programOptions) {
 		return false;
 	}
 	
+	return true;
+	// TODO move save to config file after adjustFrameSizeDependentParameters
 	// 2nd: save to config file
+	/*
 		if (saveConfigToFile()) {
 			return true;
 		} else { // not able to save parameter changes from cmd line to config file
 			cerr << "readCmdLine: error saving config to db file" << endl;
 			return false;
 		}
-
+		*/
 }
 
 
@@ -438,6 +445,15 @@ bool Config::readConfigFile(std::string configFilePath) {
 		return false;
 	}
 
+	// close db
+	int rc = sqlite3_close(m_dbHandle);
+	if (rc == SQLITE_OK) {
+		m_dbHandle = nullptr;
+	} else {
+		cerr << "readConfigFile: error closing " << configFilePath << endl;
+		return false;
+	}
+
 	// all functions returned successful
 	return true;
 }
@@ -472,9 +488,8 @@ bool Config::saveConfigToFile(std::string configFilePath) {
 	}
 
 	// wrap in transaction
-
 	string answer;
-	string sqlStmt = "BEGIN TRANSACTION";
+	string sqlStmt = "BEGIN TRANSACTION;";
 	if (!queryDbSingle(sqlStmt, answer)) {
 		cerr << "saveConfigToFile: begin transaction failed" << endl;
 		return false;
@@ -488,7 +503,7 @@ bool Config::saveConfigToFile(std::string configFilePath) {
 		cerr << "saveConfigToFile: db table does not exist, cannot create it" << endl;
 		return false;
 	}
-
+	
 	// read all parameters and insert into db
 	// if it does not exist -> insert
 	// otherwise            -> update
@@ -515,13 +530,22 @@ bool Config::saveConfigToFile(std::string configFilePath) {
 	}
 
 	// end transaction
-	sqlStmt = "END TRANSACTION";
+	sqlStmt = "END TRANSACTION;";
 	if (!queryDbSingle(sqlStmt, answer)) {
 		cerr << "saveConfigToFile: end transaction failed" << endl;
 		return false;
 	}
 
-	return success;
+	// close db
+	int rc = sqlite3_close(m_dbHandle);
+	if (rc == SQLITE_OK) {
+		m_dbHandle = nullptr;
+	} else {
+		cerr << "saveConfigFile: error closing " << configFilePath << endl;
+		return false;
+	}
+
+	return true;
 }
 
 

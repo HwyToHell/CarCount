@@ -9,7 +9,10 @@
 
 using namespace std;
 
-int _main(int argc, char* argv[]) {
+void adjustFrameSizeParams(Config conf, FrameHandler& fh);
+bool openCapSource(Config& conf, FrameHandler& fh);
+
+int main(int argc, char* argv[]) {
 	// TODO define region of interest --> TODO: select graphical -or- detect by optical flow
 	
 	// command line arguments
@@ -18,87 +21,103 @@ int _main(int argc, char* argv[]) {
 	//  q(uiet)			quiet mode (take standard arguments from config file
 	//  r(ate):			cam fps
 	//  v(ideo size):	cam resolution ID (single digit number)
+
 	char* av[] = {
 		argv[0],
 		"-i",
-		"traffic320x240.avi" };
+		"traffic640x480.avi" };
+		//"traffic320x240.avi" };
 	int ac = sizeof(av) / sizeof(av[0]);
 
-	ProgramOptions cmdLineOpts(ac, av, "i:qr:v:");
+	int nArgs = 0;
+	char** argStrings = nullptr;
+	// 't' indicates test for debugging in IDE
+	// (project properties -> debugging -> command arguments)
+	if ((argc > 1) && (*argv[1] == 't')) {
+		nArgs = ac;
+		argStrings = av;
+	// otherwize use standard command line arguments
+	} else {
+		nArgs = argc;
+		argStrings = argv;
+	}
+		
+	ProgramOptions cmdLineOpts(nArgs, argStrings, "i:qr:v:");
 	//ProgramOptions cmdLineOpts(argc, argv, "i:qr:v:");
+
+	// create config, initialize standard parameter list, set path to config file
 	Config config;
 	Config* pConfig = &config;
 
-	bool succ = config.readCmdLine(cmdLineOpts);
-	if (!succ)
+	// TODO fcn: bool readConfigOptions(Config&);
+	// read config file (sqlite db)
+	if (!config.readConfigFile()) {
+		std::cerr << "error reading config file" << std::endl;
 		return (EXIT_FAILURE);
+	}
 
-	FrameHandler frameHandler(pConfig); // frame reading, segmentation, drawing fcn
+	// parse command line options
+	if (!config.readCmdLine(cmdLineOpts)) {
+		std::cerr << "error parsing command line options" << std::endl;
+		return EXIT_FAILURE;
+	}
+	
+	// frame reading, segmentation, drawing fcn
+	FrameHandler frameHandler(pConfig); 
 	FrameHandler* pFrameHandler = &frameHandler;
 	config.attach(pFrameHandler);
 
-	// capSource must be open in order to set frame size
-	string videoFilePath = frameHandler.locateFilePath("traffic320x240.avi");
-	succ = frameHandler.initFileReader(videoFilePath);
-	cv::Size2d frameSize = frameHandler.getFrameSize();
+	// capSource must be open in order to know frame size
+	if (!openCapSource(config, frameHandler)) {
+		std::cerr << "error opening capture source" << std::endl;
+		return EXIT_FAILURE;
+	}
 	
 	// recalcFrameSizeDependentParams, if different frame size
-	int widthNew = static_cast<int>(frameHandler.getFrameSize().width);
-	int heightNew = static_cast<int>(frameHandler.getFrameSize().height);
-	int widthActual = stoi(config.getParam("frame_size_x"));
-	int heightActual = stoi(config.getParam("frame_size_y"));
-	if ( widthNew != widthActual || heightNew != heightActual ) 
-		 frameHandler.adjustFrameSizeDependentParams(widthNew, heightNew);
+	adjustFrameSizeParams(config, frameHandler);
+	config.saveConfigToFile();
 
-	frameHandler.loadInset("inset3.png");
-
-	SceneTracker scene(pConfig); // collection of tracks and vehicles with MOG2
+	// collection of tracks and vehicles with MOG2
+	SceneTracker scene(pConfig); 
 	SceneTracker* pScene = &scene;
 	config.attach(pScene);
 
-	CountRecorder recorder; // counting vehicles and save results in db
-	CountRecorder* pRecorder = &recorder;
-	scene.attachCountRecorder(pRecorder);
-
+	// counting vehicles 
+	// TODO save results in db, using CountRecorder class
 	CountResults cr;
 
+	// create inset
+	string insetImgPath = config.getParam("application_path");
+	appendDirToPath(insetImgPath, config.getParam("inset_file"));
+	Inset inset = frameHandler.createInset(insetImgPath);
+	inset.putCount(cr);
 
 	list<TrackEntry> bboxList; // debug only, delete after
 	list<Track> trackList;
 
 
-	/* TODO un-comment after testing camera
-	 * if (!frameHandler.openCapSource(true)) 
-	 *	return -1;
-	 */
-
 	while(true)
 	{
 		
-		if (!frameHandler.segmentFrame())
+		if (!frameHandler.segmentFrame()) {
+			cerr << "frame segmentation failed" << endl;
 			break;
+		}
 
-		int type = frameHandler.getFrameInfo();
-		
+
 		bboxList = frameHandler.calcBBoxes();
-
 		trackList = scene.updateTracks(bboxList);
 
-		//vehicleList = scene.combineTracks();
-
+		// DEBUG
 		scene.inspect(frameHandler.getFrameCount());
 
 		cr += scene.countVehicles(frameHandler.getFrameCount());
-		
-		//CountResults cr = recorder.getStatus();
+		inset.putCount(cr);
 
-		frameHandler.showFrame(trackList, cr);
+		frameHandler.showFrame(trackList, inset);
 
 		//frameHandler.writeFrame();
 
-
-	
-		
 		StopStartNextFrame();
 		if (cv::waitKey(10) == 27) 	{
 			cout << "ESC pressed -> end video processing" << endl;
@@ -107,6 +126,7 @@ int _main(int argc, char* argv[]) {
 		}
 	}
 
+	CountRecorder recorder(cr);
 	recorder.printResults();
 
 	cv::waitKey(0);
@@ -114,4 +134,36 @@ int _main(int argc, char* argv[]) {
 }
 
 
+void adjustFrameSizeParams(Config conf, FrameHandler& fh) {
+	int widthNew = static_cast<int>(fh.getFrameSize().width);
+	int heightNew = static_cast<int>(fh.getFrameSize().height);
+	int widthActual = stoi(conf.getParam("frame_size_x"));
+	int heightActual = stoi(conf.getParam("frame_size_y"));
+	if ( widthNew != widthActual || heightNew != heightActual ) 
+		 fh.adjustFrameSizeDependentParams(widthNew, heightNew);
+	return;
+}
 
+bool openCapSource(Config& conf, FrameHandler& fh) {
+	bool isFromCam = stob(conf.getParam("is_video_from_cam"));
+	bool success = false;
+	
+	if (isFromCam) {
+		// initCam
+		int camID = stoi(conf.getParam("cam_device_ID"));
+		int camResolutionID = stoi(conf.getParam("cam_resolution_ID"));
+		success = fh.initCam(camID, camResolutionID);
+	} else {
+		// init video file
+		std::string videoFileName = conf.getParam("video_file");
+		std::string videoFilePath = fh.locateFilePath(videoFileName);
+		success = fh.initFileReader(videoFilePath);
+	}
+
+	if (success) {
+		return true;
+	} else {
+		std::cerr << "video device cannot be opened" << std::endl;
+		return false;
+	}
+}

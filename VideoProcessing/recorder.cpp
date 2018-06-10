@@ -11,6 +11,19 @@ CountResults CountResults::operator+=(const CountResults& rhs) {
 	return *this;
 }
 
+
+CountRecorder::CountRecorder() : 
+	mCarCntLeft(0), 
+	mCarCntRight(0), 
+	mTruckCntLeft(0), 
+	mTruckCntRight(0) {}
+
+CountRecorder::CountRecorder(CountResults cr) : 
+	mCarCntLeft(cr.carLeft),
+	mTruckCntLeft(cr.truckLeft),
+	mCarCntRight(cr.carRight),
+	mTruckCntRight(cr.truckRight) {}
+
 void CountRecorder::updateCnt(bool movesLeft, bool isTruck) {
 	if (isTruck) {
 		if (movesLeft) {
