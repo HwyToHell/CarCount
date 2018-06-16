@@ -17,7 +17,12 @@ Arrow::Arrow(cv::Point start, cv::Point end, cv::Scalar color, int thickness):
 
 
 void Arrow::put(cv::Mat& image) {
-	arrowedLine(image, m_start, m_end, m_color, m_thickness, 8, 0, 0.05);
+    if (CV_VERSION_MAJOR == 2 && CV_VERSION_MINOR < 9) {
+        // TODO subst arrowed line
+        cv::line(image, m_start, m_end, m_color, m_thickness, 8, 0);
+    } else {
+       // cv::arrowedLine(image, m_start, m_end, m_color, m_thickness, 8, 0, 0.05);
+    }
 	return;
 }
 
@@ -112,7 +117,7 @@ int TextRow::setText(const std::string& text, const int colWidth) {
 // TextColumn ////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 TextColumn::TextColumn(const cv::Point origin, const int colWidth, const Align colAlign):
-	m_origin(origin), m_colWidth(colWidth), m_colAlign(colAlign) {}
+    m_colAlign(colAlign), m_colWidth(colWidth), m_origin(origin) {}
 
 
 /// Add text row to column block
@@ -353,11 +358,9 @@ void Inset::putCount(CountResults cr) {
 //////////////////////////////////////////////////////////////////////////////
 FrameHandler::FrameHandler(Config* pConfig) : 
 	Observer(pConfig), 
-	mMog2(100, 25, false),
+    mFrameCounter(0),
 	m_isCaptureInitialized(false),
-	m_captureWinCam(nullptr),
-	mFrameCounter(0) {
-
+    mMog2(100, 25, false) {
 	// instantiate cam input
 	#if defined (_WIN32)
 	m_captureWinCam = std::unique_ptr<CamInput>(new CamInput);
@@ -450,7 +453,7 @@ std::list<TrackEntry>& FrameHandler::calcBBoxes() {
 Inset FrameHandler::createInset(std::string insetFilePath) {
 	using namespace std;
 
-	cv::Size frameSize(static_cast<cv::Size>(m_frameSize));
+    cv::Size frameSize((int)m_frameSize.width, (int)m_frameSize.height);
 	if (frameSize.width == 0 || frameSize.height == 0) {
 		cerr << "createInset: wrong frame size: " << frameSize << endl;
 	}
@@ -493,8 +496,6 @@ Inset FrameHandler::createInset(std::string insetFilePath) {
 
 
 int FrameHandler::getFrameInfo() {
-	int ch = mFrame.channels();
-	int de = mFrame.depth();
 	int type = mFrame.type();
 	return type;
 }
@@ -539,6 +540,7 @@ bool FrameHandler::initCam(int camID, int camResolutionID) {
 	}
 
 	#elif defined (__linux__)
+    (void)camResolutionID;
 	// use cv::Capture
 	m_capture.open(camID);
 	if (!m_capture.isOpened()) {
@@ -579,6 +581,11 @@ bool FrameHandler::initFileReader(std::string videoFilePath) {
 	}
 
 	// retrieve frame size
+    // one frame must be read in order to get a return value from cap.get()
+    cv::Mat firstFrame;
+    if (!m_capture.read(firstFrame)) {
+        cerr << "initFileReader: cannot read first frame in order to get resolution" << endl;
+    }
 	m_frameSize.width = m_capture.get(CV_CAP_PROP_FRAME_WIDTH);
 	m_frameSize.height = m_capture.get(CV_CAP_PROP_FRAME_HEIGHT);
 	if (m_frameSize.height == 0 || m_frameSize.width == 0) {
@@ -603,7 +610,7 @@ std::string FrameHandler::locateFilePath(std::string fileName) {
 	#if defined (_WIN32)
 		char bufPath[_MAX_PATH];
 		_getcwd(bufPath, _MAX_PATH);
-		if (bufPath) {
+        if (strlen(bufPath) > 0) {
 			currentPath = string(bufPath);
 		} else {
 			cerr << "locateVideoFile: error reading current directory" << endl;
@@ -614,13 +621,13 @@ std::string FrameHandler::locateFilePath(std::string fileName) {
 	#elif defined (__linux__)
 		char bufPath[PATH_MAX];
 		getcwd(bufPath, PATH_MAX);
-		if (bufPath) {
+        if (strlen(bufPath) > 0) {
 			currentPath = string(bufPath);
 		} else {
 			cerr << "locateVideoFile: error reading current directory" << endl;
 			if (errno == ENAMETOOLONG)
 				cerr << "locateVideoFile: path length > PATH_MAX" << endl;
-			return false;
+            return path;
 		}
 	#else
 		throw "unsupported OS";

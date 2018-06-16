@@ -5,7 +5,11 @@
 #include "../include/frame_handler.h"
 #include "../include/tracker.h"
 #include "../include/recorder.h"
+#if defined (_WIN32)
 #include "../../../cpp/inc/program_options.h"
+#else
+#include "../../cpp/inc/program_options.h"
+#endif
 
 using namespace std;
 
@@ -22,10 +26,10 @@ int main(int argc, char* argv[]) {
 	//  r(ate):			cam fps
 	//  v(ideo size):	cam resolution ID (single digit number)
 
-	char* av[] = {
+    char* av[] = {
 		argv[0],
-		"-i",
-		"traffic640x480.avi" };
+        (char*)"-i",
+        (char*)"traffic320x240.avi" };
 		//"traffic320x240.avi" };
 	int ac = sizeof(av) / sizeof(av[0]);
 
@@ -52,9 +56,8 @@ int main(int argc, char* argv[]) {
 	// TODO fcn: bool readConfigOptions(Config&);
 	// read config file (sqlite db)
 	if (!config.readConfigFile()) {
-		std::cerr << "error reading config file" << std::endl;
-		return (EXIT_FAILURE);
-	}
+        config.saveConfigToFile();
+    }
 
 	// parse command line options
 	if (!config.readCmdLine(cmdLineOpts)) {
@@ -117,8 +120,9 @@ int main(int argc, char* argv[]) {
 		frameHandler.showFrame(trackList, inset);
 
 		//frameHandler.writeFrame();
-
+        #if defined (_WIN32)
 		StopStartNextFrame();
+        #endif
 		if (cv::waitKey(10) == 27) 	{
 			cout << "ESC pressed -> end video processing" << endl;
 			//cv::imwrite("frame.jpg", frame);

@@ -2,9 +2,13 @@
 #include "../include/config.h"
 
 #include <cctype> // isdigit()
+#if defined (_WIN32)
 #include <io.h> // _access()
-
 #pragma warning(disable: 4996)
+#else
+#include <unistd.h>
+#endif
+
 
 using namespace std;
 
@@ -507,13 +511,13 @@ bool Config::saveConfigToFile(std::string configFilePath) {
 	// read all parameters and insert into db
 	// if it does not exist -> insert
 	// otherwise            -> update
-	bool success = false;
-	list<Parameter>::iterator iParam = m_paramList.begin();
+    bool success = false;
+    list<Parameter>::iterator iParam = m_paramList.begin();
 	while (iParam != m_paramList.end())	{
 		ss.str("");
 		ss << "select 1 from " << m_configTableName << " where name='" << iParam->getName() << "';";
 		sqlStmt = ss.str();
-		success = queryDbSingle(sqlStmt, answer);
+        success = queryDbSingle(sqlStmt, answer);
 
 		// check, if parameter row exists in db
 		ss.str("");
@@ -528,6 +532,10 @@ bool Config::saveConfigToFile(std::string configFilePath) {
 		success = queryDbSingle(sqlStmt, answer);
 		++iParam;
 	}
+
+    if  (!success) {
+        cerr << "saveConfigToFile: writing parameters to db failed" << endl;
+    }
 
 	// end transaction
 	sqlStmt = "END TRANSACTION;";
@@ -644,13 +652,13 @@ std::string getHomePath() {
 		}
 
 	#elif defined (__linux__)
-		char *pHome = nullptr;
+        char *pHomePath = nullptr;
 		pHomePath = getenv("HOME");
-		if (pHome ==0) {
+        if (pHomePath ==0) {
 			cerr << "getHomePath: no home path set in $env" << endl;
 			return std::string("");
 		} else {
-			home += pHome;
+            home += pHomePath;
 			home += '/';
 		}
 	#else
@@ -674,8 +682,18 @@ bool makeDir(const std::string& dir) {
 		else 
 			return false;
 	#elif defined (__linux__)
-		// TODO use mkdir from <unistd.h>
-		throw "linux";
+        // TODO use mkdir from <sys/stat.h>
+        int status = mkdir(dir.c_str(), S_IRWXO);
+        if (status == 0) {
+            return true;
+        } else {
+            cerr << "error mkdir " << dir << endl;
+            switch (errno) {
+                case EACCES: cerr << "permission denied" << endl; break;
+                case EEXIST: cerr << "file exists" << endl; break;
+            }
+            return false;
+        }
 	#else
 		throw "unsupported OS";
 	#endif
@@ -721,8 +739,13 @@ bool isFileExist(const std::string& path) {
 		//        EINVAL == invalid parameter
 	}
 	#elif defined (__linux__)
-		// TODO use stat from <sys/stat.h>
-		throw "linux";
+        // TODO use access from <unistd.h>
+    int status = access(path.c_str(), F_OK);
+    if (status == 0) {
+        return true;
+    } else {
+        return false;
+    }
 	#else
 		throw "unsupported OS";
 	#endif

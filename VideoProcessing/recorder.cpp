@@ -20,8 +20,8 @@ CountRecorder::CountRecorder() :
 
 CountRecorder::CountRecorder(CountResults cr) : 
 	mCarCntLeft(cr.carLeft),
+    mCarCntRight(cr.carRight),
 	mTruckCntLeft(cr.truckLeft),
-	mCarCntRight(cr.carRight),
 	mTruckCntRight(cr.truckRight) {}
 
 void CountRecorder::updateCnt(bool movesLeft, bool isTruck) {

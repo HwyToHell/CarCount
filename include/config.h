@@ -1,7 +1,14 @@
 #pragma once
 #include "tracker.h"
+
+#if defined (_WIN32)
 #include "../../../cpp/inc/observer.h"
 #include "../../../cpp/inc/program_options.h"
+#else
+#include "../../cpp/inc/observer.h"
+#include "../../cpp/inc/program_options.h"
+#endif
+
 
 class Parameter {
 private:

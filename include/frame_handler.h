@@ -1,10 +1,13 @@
 #pragma once
 #include <memory> // shared_ptr
+#if defined (_WIN32)
+#pragma warning(disable: 4996) // MSVC: crt secure warnings
+#pragma warning(disable: 4482) // MSVC10: enum nonstd extension
 #include "cam_cap_dshow.h"
+#endif
 #include "config.h"
 #include "recorder.h"
 
-#pragma warning(disable: 4482)
 
 //////////////////////////////////////////////////////////////////////////////
 // Types /////////////////////////////////////////////////////////////////////
@@ -143,8 +146,11 @@ private:
 		int deviceID;
 		int resolutionID; }		m_camProps;
 	cv::VideoCapture			m_capture;
+#if defined (_WIN32)
 	std::unique_ptr<CamInput>	m_captureWinCam; // substitute for cv::VideoCapture
-	std::string					m_inVideoFilePath;
+#endif
+
+    std::string					m_inVideoFilePath;
 	cv::Mat						mFrame;
 	cv::Mat						mFgrMask; // foreground mask of moving objects
 	int							mFrameCounter; 

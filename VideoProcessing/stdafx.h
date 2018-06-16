@@ -4,18 +4,22 @@
 //
 
 #pragma once
-
+#if defined (_WIN32)
+#include <conio.h>
+#include <windows.h>
+#include <direct.h>		// for _mkdir, _getcwd
+#else
+#include <sys/stat.h>
+#include <unistd.h>
+#endif
 #include <assert.h>		// for vibe
 #include <cmath>
-#include <conio.h>
 #include <ctime>
-#include <direct.h>		// for _mkdir, _getcwd
 #include <iomanip>
 #include <iostream>
 #include <list>
 #include <string>
 #include <time.h>		// for vibe
-#include <windows.h>
 
 #include <opencv2/opencv.hpp>
 #include <sqlite3.h>

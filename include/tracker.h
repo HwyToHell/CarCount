@@ -1,6 +1,12 @@
 #pragma once
+
+#if defined (_WIN32)
 #include "../../../cpp/inc/observer.h"
 #include "../include/recorder.h"
+#else
+#include "../../cpp/inc/observer.h"
+#include "../include/recorder.h"
+#endif
 
 // helper functions
 double euclideanDist(const cv::Point& pt1, const cv::Point& pt2);

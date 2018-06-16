@@ -39,8 +39,6 @@ cv::Point2i& TrackEntry::centroid() {
 
 /// maxDist between centroids allowed
 bool TrackEntry::isClose(TrackEntry& teCompare, int maxDist) {
-	int dist_x = maxDist; // default: 30
-	int dist_y = maxDist; // default: 30
 	bool x_close, y_close;
 
 	x_close = ( abs(this->centroid().x - teCompare.centroid().x) < maxDist );
@@ -75,8 +73,8 @@ int TrackEntry::width() {
 // Track /////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-Track::Track(TrackEntry& blob, int id) : mId(id), mAvgVelocity(0,0), mConfidence(0),
-	mCounted(false), mMarkedForDelete(false)  {
+Track::Track(TrackEntry& blob, int id) : mAvgVelocity(0,0), mConfidence(0),
+    mCounted(false), mId(id), mMarkedForDelete(false)  {
 	mHistory.push_back(blob);
 }
 
@@ -382,6 +380,7 @@ struct Trk {
 
 void SceneTracker::inspect(int frameCnt) {
 	vector<Trk> tracks;
+    (void(frameCnt));
 	list<Track>::iterator iTrack = mTracks.begin();
 	while (iTrack != mTracks.end()) {
 		tracks.push_back(Trk(iTrack->getId(), iTrack->getConfidence(), iTrack->getVelocity().x, iTrack->isCounted()));
