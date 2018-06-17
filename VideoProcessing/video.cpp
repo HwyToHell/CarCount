@@ -29,8 +29,9 @@ int main(int argc, char* argv[]) {
     char* av[] = {
 		argv[0],
         (char*)"-i",
-        (char*)"traffic320x240.avi" };
-		//"traffic320x240.avi" };
+        (char*)"traffic640x480.avi" };
+        //(char*)"traffic320x240.avi" };
+
 	int ac = sizeof(av) / sizeof(av[0]);
 
 	int nArgs = 0;
@@ -96,7 +97,7 @@ int main(int argc, char* argv[]) {
 	inset.putCount(cr);
 
 	list<TrackEntry> bboxList; // debug only, delete after
-	list<Track> trackList;
+    list<Track>* pTracks;
 
 
 	while(true)
@@ -109,7 +110,7 @@ int main(int argc, char* argv[]) {
 
 
 		bboxList = frameHandler.calcBBoxes();
-		trackList = scene.updateTracks(bboxList);
+        pTracks = scene.updateTracks(bboxList);
 
 		// DEBUG
 		scene.inspect(frameHandler.getFrameCount());
@@ -117,7 +118,7 @@ int main(int argc, char* argv[]) {
 		cr += scene.countVehicles(frameHandler.getFrameCount());
 		inset.putCount(cr);
 
-		frameHandler.showFrame(trackList, inset);
+        frameHandler.showFrame(pTracks, inset);
 
 		//frameHandler.writeFrame();
         #if defined (_WIN32)

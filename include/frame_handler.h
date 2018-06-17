@@ -130,7 +130,7 @@ public:
 	bool					openCapSource(bool fromFile = true); // wraps initCam() and initFileReader()
 	bool					openVideoOut(std::string fileName);
 	bool					segmentFrame();
-	void					showFrame(std::list<Track>& tracks, Inset inset);
+    void					showFrame(std::list<Track>* tracks, Inset inset);
 	void					writeFrame();
 	// DEBUG
 	int						getFrameCount();

@@ -99,7 +99,7 @@ public:
 	void printVehicles();
 	bool returnTrackID(int id);
 	void update(); // updates observer with subject's parameters (Config)
-	std::list<Track>& updateTracks(std::list<TrackEntry>& blobs);
+    std::list<Track>* updateTracks(std::list<TrackEntry>& blobs);
 	
 	// DEBUG
 	void inspect(int frameCnt);

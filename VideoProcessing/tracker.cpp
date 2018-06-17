@@ -328,7 +328,7 @@ void SceneTracker::update() {
 /// assign blobs to existing tracks
 ///  create new tracks from unassigned blobs
 ///  erase, if marked for deletion
-std::list<Track>& SceneTracker::updateTracks(list<TrackEntry>& blobs) {
+std::list<Track>* SceneTracker::updateTracks(list<TrackEntry>& blobs) {
 
 	// assign blobs to existing tracks
 	// delete orphaned tracks and free associated Track-ID
@@ -361,7 +361,7 @@ std::list<Track>& SceneTracker::updateTracks(list<TrackEntry>& blobs) {
 	}
 	blobs.clear();
 	
-	return mTracks;
+    return &mTracks;
 }
 
 

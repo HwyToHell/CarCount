@@ -4,6 +4,21 @@
 //#include <exception>
 #include <sstream>
 
+void arrowedLine_cv_2_9(cv::Mat& image, cv::Point start, cv::Point end, cv::Scalar color,
+        int thickness = 1, int lineType = 8, int shift = 0, double tipLength = 0.1) {
+    double tipAngle = CV_PI / 6; // 30 degrees
+    double tipSize = cv::norm(end - start) * tipLength;
+    double angle = atan2(start.y - end.y, start.x - end.x);
+    cv::Point p;
+    p.x = cvRound(end.x + tipSize * cos(angle + tipAngle));
+    p.y = cvRound(end.y + tipSize * sin(angle + tipAngle));
+    cv::line(image, end, p, color, thickness, lineType);
+    p.x = cvRound(end.x + tipSize * cos(angle - tipAngle));
+    p.y = cvRound(end.y + tipSize * sin(angle - tipAngle));
+    cv::line(image, end, p, color, thickness, lineType, shift);
+    cv::line(image, start, end, color, thickness, lineType, shift);
+    return;
+}
 
 //////////////////////////////////////////////////////////////////////////////
 // Arrow /////////////////////////////////////////////////////////////////////
@@ -17,12 +32,11 @@ Arrow::Arrow(cv::Point start, cv::Point end, cv::Scalar color, int thickness):
 
 
 void Arrow::put(cv::Mat& image) {
-    if (CV_VERSION_MAJOR == 2 && CV_VERSION_MINOR < 9) {
-        // TODO subst arrowed line
-        cv::line(image, m_start, m_end, m_color, m_thickness, 8, 0);
-    } else {
-       // cv::arrowedLine(image, m_start, m_end, m_color, m_thickness, 8, 0, 0.05);
-    }
+#if defined CV_VERSION_EPOCH && CV_VERSION_MINOR <=9
+    arrowedLine_cv_2_9(image, m_start, m_end, m_color, m_thickness, 8, 0, 0.05);
+#else
+    cv::arrowedLine(image, m_start, m_end, m_color, m_thickness, 8, 0, 0.05);
+#endif
 	return;
 }
 
@@ -737,7 +751,7 @@ bool FrameHandler::segmentFrame() {
 }
 
 
-void FrameHandler::showFrame(std::list<Track>& tracks, Inset inset) {
+void FrameHandler::showFrame(std::list<Track>* tracks, Inset inset) {
 	// show frame counter, int font = cnt % 8;
 	cv::putText(mFrame, std::to_string((long long)mFrameCounter), cv::Point(10,20), 0, 0.5, green, 1);
 	cv::rectangle(mFrame, mRoi, blue);
@@ -746,8 +760,8 @@ void FrameHandler::showFrame(std::list<Track>& tracks, Inset inset) {
 
 	// show tracking boxes around vehicles
 	cv::Rect rec;
-	std::list<Track>::iterator iTrack = tracks.begin();
-	while (iTrack != tracks.end()){
+    std::list<Track>::iterator iTrack = tracks->begin();
+    while (iTrack != tracks->end()){
 		rec = iTrack->getActualEntry().rect();
 		rec.x += (int)mRoi.x;
 		rec.y += (int)mRoi.y;
