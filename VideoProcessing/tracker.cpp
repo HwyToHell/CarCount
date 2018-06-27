@@ -33,12 +33,12 @@ TrackEntry::TrackEntry(cv::Rect _bbox) : mBbox(_bbox) {
 	mCentroid.y = mBbox.y + (mBbox.height / 2);
 }
 
-cv::Point2i& TrackEntry::centroid() {
+cv::Point2i TrackEntry::centroid() const {
 	return mCentroid;
 }
 
 /// maxDist between centroids allowed
-bool TrackEntry::isClose(TrackEntry& teCompare, int maxDist) {
+bool TrackEntry::isClose(const TrackEntry& teCompare, const int maxDist) {
 	bool x_close, y_close;
 
 	x_close = ( abs(this->centroid().x - teCompare.centroid().x) < maxDist );
@@ -48,7 +48,7 @@ bool TrackEntry::isClose(TrackEntry& teCompare, int maxDist) {
 }
 
 /// maxDeviation% in width and height allowed
-bool TrackEntry::isSizeSimilar(TrackEntry& teCompare, double maxDeviation) {
+bool TrackEntry::isSizeSimilar(const TrackEntry& teCompare, const double maxDeviation) {
 	if ( abs(this->width() - teCompare.width()) > (this->width() * maxDeviation / 100 ) )
 		return false;
 	if ( abs(this->height() - teCompare.height()) > (this->height() * maxDeviation / 100 ) )
@@ -56,15 +56,15 @@ bool TrackEntry::isSizeSimilar(TrackEntry& teCompare, double maxDeviation) {
 	return true;
 }
 
-int TrackEntry::height() {
+int TrackEntry::height() const {
 	return mBbox.height;
 }
 
-cv::Rect& TrackEntry::rect() {
+cv::Rect TrackEntry::rect() const {
 	return mBbox;
 }
 
-int TrackEntry::width() {
+int TrackEntry::width() const {
 	return mBbox.width;
 }
 
@@ -73,7 +73,7 @@ int TrackEntry::width() {
 // Track /////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////////////
 
-Track::Track(TrackEntry& blob, int id) : mAvgVelocity(0,0), mConfidence(0),
+Track::Track(const TrackEntry& blob, int id) : mAvgVelocity(0,0), mConfidence(0),
     mCounted(false), mId(id), mMarkedForDelete(false)  {
 	mHistory.push_back(blob);
 }

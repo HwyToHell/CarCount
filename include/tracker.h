@@ -27,13 +27,13 @@ public:
 	TrackEntry(int x = 0, int y = 0, int width = 100, int height = 50);
 	TrackEntry(cv::Rect rect);
 	
-	cv::Point2i& centroid();
-	int height();
-	cv::Rect& rect();
-	int width();
+    cv::Point2i centroid() const;
+    int height() const;
+    cv::Rect rect() const;
+    int width() const;
 
-	bool isClose(TrackEntry& teCompare, int maxDist);
-	bool isSizeSimilar(TrackEntry& teCompare, double maxDeviation);
+    bool isClose(const TrackEntry& teCompare, const int maxDist);
+    bool isSizeSimilar(const TrackEntry& teCompare, const double maxDeviation);
 };
 
 
@@ -50,7 +50,7 @@ private:
 	cv::Point2d& updateAverageVelocity();
 
 public:
-	Track(TrackEntry& blob, int id = 0);
+    Track(const TrackEntry& blob, int id = 0);
 	Track& operator= (const Track& source);
 	
 	void addTrackEntry(const TrackEntry& blob);

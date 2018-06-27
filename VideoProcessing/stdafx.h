@@ -6,8 +6,8 @@
 #pragma once
 #if defined (_WIN32)
 #include <conio.h>
-#include <windows.h>
 #include <direct.h>		// for _mkdir, _getcwd
+#include <windows.h>
 #else
 #include <sys/stat.h>
 #include <unistd.h>

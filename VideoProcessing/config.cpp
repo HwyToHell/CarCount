@@ -687,12 +687,13 @@ bool makeDir(const std::string& dir) {
         if (status == 0) {
             return true;
         } else {
-            cerr << "error mkdir " << dir << endl;
-            switch (errno) {
-                case EACCES: cerr << "permission denied" << endl; break;
-                case EEXIST: cerr << "file exists" << endl; break;
-            }
+            if (errno == EEXIST) {
+                return true;
+            } else {
+                if (errno == EACCES)
+                    cerr << "permission denied" << endl;
             return false;
+            }
         }
 	#else
 		throw "unsupported OS";

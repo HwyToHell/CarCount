@@ -16,7 +16,7 @@ using namespace std;
 void adjustFrameSizeParams(Config conf, FrameHandler& fh);
 bool openCapSource(Config& conf, FrameHandler& fh);
 
-int main(int argc, char* argv[]) {
+int main(int argc, const char* argv[]) {
 	// TODO define region of interest --> TODO: select graphical -or- detect by optical flow
 	
 	// command line arguments
@@ -26,16 +26,16 @@ int main(int argc, char* argv[]) {
 	//  r(ate):			cam fps
 	//  v(ideo size):	cam resolution ID (single digit number)
 
-    char* av[] = {
-		argv[0],
-        (char*)"-i",
-        (char*)"traffic640x480.avi" };
+    const char* av[] = {
+        argv[0],
+        "-i",
+        "traffic640x480.avi" };
         //(char*)"traffic320x240.avi" };
 
 	int ac = sizeof(av) / sizeof(av[0]);
 
 	int nArgs = 0;
-	char** argStrings = nullptr;
+    const char** argStrings = nullptr;
 	// 't' indicates test for debugging in IDE
 	// (project properties -> debugging -> command arguments)
 	if ((argc > 1) && (*argv[1] == 't')) {
