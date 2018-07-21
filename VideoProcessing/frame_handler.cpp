@@ -600,8 +600,14 @@ bool FrameHandler::initFileReader(std::string videoFilePath) {
     if (!m_capture.read(firstFrame)) {
         cerr << "initFileReader: cannot read first frame in order to get resolution" << endl;
     }
-	m_frameSize.width = m_capture.get(CV_CAP_PROP_FRAME_WIDTH);
-	m_frameSize.height = m_capture.get(CV_CAP_PROP_FRAME_HEIGHT);
+
+    // GStreamer 0.1 does not return frame size in linux
+    //  so VideoCapture::get(CV_CAP_PROP_FRAME_XXXXX) does not work
+    //	m_frameSize.width = m_capture.get(CV_CAP_PROP_FRAME_WIDTH);
+    //  m_frameSize.height = m_capture.get(CV_CAP_PROP_FRAME_HEIGHT);
+    //
+    cv::Size m_frameSize = firstFrame.size();
+
 	if (m_frameSize.height == 0 || m_frameSize.width == 0) {
 		cerr << "initFileReader: wrong cam resolution" << endl;
 		return false;

@@ -683,7 +683,8 @@ bool makeDir(const std::string& dir) {
 			return false;
 	#elif defined (__linux__)
         // TODO use mkdir from <sys/stat.h>
-        int status = mkdir(dir.c_str(), S_IRWXO);
+        mode_t permission = S_IRWXU | S_IRWXG | S_IRWXO;
+        int status = mkdir(dir.c_str(), permission);
         if (status == 0) {
             return true;
         } else {
